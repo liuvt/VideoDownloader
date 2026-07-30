@@ -150,8 +150,45 @@
 </head>
 <body>
     <component type="typeof(App)" render-mode="ServerPrerendered" />
+    <!-- Reconnect element ẩn hoàn toàn -->
+    <div id="components-reconnect-modal"
+        class="components-reconnect-hide"
+        aria-hidden="true"></div>
+    <script src="~/js/blazor-reconnect.js" asp-append-version="true"></script>
 
     <script src="js/site.js" asp-append-version="true"></script>
     <script src="_framework/blazor.server.js"></script>
+
+    <script>
+    Blazor.start({
+        configureSignalR: function (builder) {
+            // Cho phép mạng di động chậm hoặc tab vừa được đánh thức
+            builder.withServerTimeout(60000);
+            builder.withKeepAliveInterval(15000);
+        },
+
+        reconnectionOptions: {
+            maxRetries: 20,
+
+            retryIntervalMilliseconds: function (previousAttempts) {
+                const delays = [
+                    0,
+                    500,
+                    1000,
+                    2000,
+                    3000,
+                    5000,
+                    10000,
+                    15000,
+                    30000
+                ];
+
+                return delays[
+                    Math.min(previousAttempts, delays.length - 1)
+                ];
+            }
+        }
+    });
+</script>
 </body>
 </html>

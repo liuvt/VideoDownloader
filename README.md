@@ -136,3 +136,48 @@ For private or login-required media, configure a protected Netscape cookie file 
 - Run downloads in a dedicated worker for multi-instance deployment.
 - Keep `yt-dlp` updated because source platforms change frequently.
 - Review YouTube, Facebook, copyright and local legal requirements before opening the service publicly.
+
+
+## Fix Reconnect blazorserver “Rejoining the server…”.
+
+```C#
+<!-- Reconnect element hiden -->
+    <div id="components-reconnect-modal"
+        class="components-reconnect-hide"
+        aria-hidden="true"></div>
+    <script src="~/js/blazor-reconnect.js" asp-append-version="true"></script>
+
+    <script src="js/site.js" asp-append-version="true"></script>
+    <script src="_framework/blazor.server.js"></script>
+
+    <script>
+    Blazor.start({
+        configureSignalR: function (builder) {
+            // allow mobile delay or timeout
+            builder.withServerTimeout(60000);
+            builder.withKeepAliveInterval(15000);
+        },
+
+        reconnectionOptions: {
+            maxRetries: 20,
+
+            retryIntervalMilliseconds: function (previousAttempts) {
+                const delays = [
+                    0,
+                    500,
+                    1000,
+                    2000,
+                    3000,
+                    5000,
+                    10000,
+                    15000,
+                    30000
+                ];
+
+                return delays[
+                    Math.min(previousAttempts, delays.length - 1)
+                ];
+            }
+        }
+    });
+```
