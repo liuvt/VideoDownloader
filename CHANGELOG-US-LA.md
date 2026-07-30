@@ -2,7 +2,7 @@
 
 ## Interface
 
-- Rebranded the public experience as ClipCurrent.
+- Rebranded the public experience as Clip2Down.
 - Replaced the generic blue SaaS layout with a GitHub-inspired developer utility design.
 - Added GitHub Primer-compatible system and monospace font stacks without shipping font files.
 - Added a terminal-style hero, command-like URL input, editorial search-intent board and distinctive dark workflow section.
