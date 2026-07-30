@@ -4,8 +4,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/var/www/videodownloader
-ExecStart=/usr/bin/dotnet /var/www/videodownloader/VideoDownloader.Blazor.dll --urls http://127.0.0.1:4123
+WorkingDirectory=/www/wwwroot/VideoDownloader.Blazor/
+ExecStart=/usr/bin/dotnet /www/wwwroot/VideoDownloader.Blazor/VideoDownloader.Blazor.dll --urls http://127.0.0.1:4123
 Restart=always
 RestartSec=5
 KillSignal=SIGINT

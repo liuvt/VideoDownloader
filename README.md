@@ -1,4 +1,4 @@
-# ClipCurrent — Blazor Server Video Downloader
+# Clip2Down — Blazor Server Video Downloader
 
 A .NET 8 Blazor Server application that downloads accessible YouTube and Facebook media through `yt-dlp` and uses FFmpeg for merging and audio conversion.
 
@@ -29,6 +29,8 @@ Tools/
 ├── yt-dlp.exe
 ├── ffmpeg.exe
 └── ffprobe.exe
+
+dotnet publish .\VideoDownloader.Blazor.csproj -c Release -o .\publish
 ```
 
 Download `yt-dlp.exe` from the official yt-dlp release page. Install FFmpeg with Winget or place the FFmpeg executables in `Tools`.
@@ -84,7 +86,7 @@ Set the real HTTPS origin before deployment. Do not leave `BaseUrl` empty behind
 ```json
 {
   "Site": {
-    "Name": "ClipCurrent",
+    "Name": "Clip2Down",
     "BaseUrl": "https://your-domain.com",
     "Description": "Download public YouTube videos, YouTube Shorts, Facebook videos and Reels as MP4 or MP3 with a fast online video downloader built for US users.",
     "Language": "en-US"
