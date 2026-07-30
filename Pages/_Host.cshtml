@@ -1,0 +1,157 @@
+@page "/"
+@namespace VideoDownloader.Blazor.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using System.Text.Json
+@using System.Collections.Generic
+@using Microsoft.Extensions.Options
+@using VideoDownloader.Blazor.Options
+@inject IOptions<SiteOptions> SiteOptionsAccessor
+@{
+    Layout = null;
+
+    var site = SiteOptionsAccessor.Value;
+    var requestOrigin = $"{Request.Scheme}://{Request.Host}";
+    var origin = string.IsNullOrWhiteSpace(site.BaseUrl)
+        ? requestOrigin
+        : site.BaseUrl.TrimEnd('/');
+    var canonicalUrl = $"{origin}/";
+    var socialImageUrl = $"{origin}/images/og-video-downloader.png";
+
+    var faqItems = new object[]
+    {
+        new Dictionary<string, object?>
+        {
+            ["@type"] = "Question",
+            ["name"] = "Can I use the same field for YouTube and Facebook links?",
+            ["acceptedAnswer"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "Answer",
+                ["text"] = "Yes. The URL field automatically recognizes supported YouTube, youtu.be, Facebook and fb.watch domains."
+            }
+        },
+        new Dictionary<string, object?>
+        {
+            ["@type"] = "Question",
+            ["name"] = "Does it support YouTube Shorts and Facebook Reels?",
+            ["acceptedAnswer"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "Answer",
+                ["text"] = "Yes, when the video is publicly accessible and the platform allows the server to retrieve that URL."
+            }
+        },
+        new Dictionary<string, object?>
+        {
+            ["@type"] = "Question",
+            ["name"] = "How long is a completed file stored?",
+            ["acceptedAnswer"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "Answer",
+                ["text"] = "Files are kept temporarily based on the server retention setting and are deleted automatically afterward."
+            }
+        }
+    };
+
+    var structuredData = new Dictionary<string, object?>
+    {
+        ["@context"] = "https://schema.org",
+        ["@graph"] = new object[]
+        {
+            new Dictionary<string, object?>
+            {
+                ["@type"] = "WebSite",
+                ["@id"] = $"{origin}/#website",
+                ["url"] = canonicalUrl,
+                ["name"] = site.Name,
+                ["description"] = site.Description,
+                ["inLanguage"] = site.Language
+            },
+            new Dictionary<string, object?>
+            {
+                ["@type"] = "WebApplication",
+                ["@id"] = $"{origin}/#application",
+                ["name"] = site.Name,
+                ["alternateName"] = "Online Video Downloader",
+                ["url"] = canonicalUrl,
+                ["description"] = site.Description,
+                ["applicationCategory"] = "MultimediaApplication",
+                ["operatingSystem"] = "Any",
+                ["browserRequirements"] = "Requires JavaScript and a modern web browser",
+                ["inLanguage"] = site.Language,
+                ["areaServed"] = new Dictionary<string, object?>
+                {
+                    ["@type"] = "Country",
+                    ["name"] = "United States"
+                },
+                ["offers"] = new Dictionary<string, object?>
+                {
+                    ["@type"] = "Offer",
+                    ["price"] = "0",
+                    ["priceCurrency"] = "USD"
+                }
+            },
+            new Dictionary<string, object?>
+            {
+                ["@type"] = "FAQPage",
+                ["@id"] = $"{origin}/#faq",
+                ["mainEntity"] = faqItems
+            }
+        }
+    };
+
+    var jsonLd = JsonSerializer.Serialize(structuredData);
+}
+
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="~/" />
+
+    <component type="typeof(Microsoft.AspNetCore.Components.Web.HeadOutlet)" render-mode="ServerPrerendered" />
+
+    <meta name="description" content="@site.Description" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="author" content="@site.Name" />
+    <meta name="application-name" content="@site.Name" />
+    <meta http-equiv="content-language" content="en-US" />
+    <meta name="theme-color" content="#0d1117" />
+    <meta name="color-scheme" content="light" />
+
+    <link rel="canonical" href="@canonicalUrl" />
+    <link rel="alternate" hreflang="en-US" href="@canonicalUrl" />
+    <link rel="alternate" hreflang="x-default" href="@canonicalUrl" />
+    <link rel="manifest" href="site.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="images/favicon.svg" />
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:site_name" content="@site.Name" />
+    <meta property="og:title" content="YouTube &amp; Facebook Video Downloader | ClipCurrent" />
+    <meta property="og:description" content="@site.Description" />
+    <meta property="og:url" content="@canonicalUrl" />
+    <meta property="og:image" content="@socialImageUrl" />
+    <meta property="og:image:secure_url" content="@socialImageUrl" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ClipCurrent online YouTube and Facebook video downloader" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="YouTube &amp; Facebook Video Downloader | ClipCurrent" />
+    <meta name="twitter:description" content="@site.Description" />
+    <meta name="twitter:image" content="@socialImageUrl" />
+    <meta name="twitter:image:alt" content="ClipCurrent online video downloader" />
+
+    <script type="application/ld+json">@Html.Raw(jsonLd)</script>
+    <link rel="stylesheet" href="css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
+
+    <script src="js/site.js" asp-append-version="true"></script>
+    <script src="_framework/blazor.server.js"></script>
+</body>
+</html>

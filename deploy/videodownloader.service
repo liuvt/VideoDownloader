@@ -1,0 +1,18 @@
+[Unit]
+Description=Blazor Video Downloader
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/var/www/videodownloader
+ExecStart=/usr/bin/dotnet /var/www/videodownloader/VideoDownloader.Blazor.dll --urls http://127.0.0.1:4123
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=videodownloader
+User=www-data
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_NOLOGO=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,544 @@
+@page "/"
+@implements IDisposable
+@inject DownloadJobStore JobStore
+@inject IVideoDownloadQueue Queue
+@inject ProviderUrlValidator UrlValidator
+@inject IJSRuntime JS
+
+<PageTitle>YouTube & Facebook Video Downloader | ClipCurrent</PageTitle>
+
+<section class="hero" aria-labelledby="hero-title">
+    <div class="hero-grid">
+        <div class="hero-copy">
+            <div class="eyebrow-row">
+                <span class="eyebrow"><span class="status-dot"></span> Online media utility</span>
+                <span class="region-chip">US · Los Angeles</span>
+            </div>
+
+            <h1 id="hero-title">Save the clip.<br /><span>Keep the momentum.</span></h1>
+            <p class="hero-description">
+                A clean online video downloader for YouTube videos, Shorts, Facebook videos and Reels.
+                Export MP4 or MP3 without installing another app.
+            </p>
+
+            <div class="hero-proof" aria-label="Product highlights">
+                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg> No account required</span>
+                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg> Temporary file storage</span>
+                <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg> Mobile ready</span>
+            </div>
+        </div>
+
+        <aside class="signal-panel" aria-label="Supported download workflow">
+            <div class="signal-titlebar">
+                <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span>clipcurrent / download</span>
+                <span class="terminal-live">live</span>
+            </div>
+            <div class="signal-body">
+                <div class="terminal-line"><span class="terminal-prompt">$</span> paste media URL</div>
+                <div class="terminal-result"><span>source</span><strong>YouTube · Facebook</strong></div>
+                <div class="terminal-result"><span>output</span><strong>MP4 · MP3</strong></div>
+                <div class="terminal-result"><span>quality</span><strong>360p → 1080p</strong></div>
+                <div class="terminal-progress"><i></i></div>
+                <div class="terminal-foot"><span>Ready for a new link</span><kbd>⌘ / Ctrl + V</kbd></div>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<section id="download" class="download-section" aria-labelledby="download-title">
+    <div class="download-card">
+        <div class="download-card-top">
+            <div>
+                <span class="section-label">01 / DOWNLOAD</span>
+                <h2 id="download-title">Paste a video link</h2>
+                <p>Use a public YouTube or Facebook URL.</p>
+            </div>
+            <div class="provider-icons" aria-label="Supported platforms">
+                <span class="provider youtube" title="YouTube">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 7.2a2.8 2.8 0 0 0-2-2C17.9 4.7 12 4.7 12 4.7s-5.9 0-7.6.5a2.8 2.8 0 0 0-2 2A29.8 29.8 0 0 0 2 12a29.8 29.8 0 0 0 .4 4.8 2.8 2.8 0 0 0 2 2c1.7.5 7.6.5 7.6.5s5.9 0 7.6-.5a2.8 2.8 0 0 0 2-2A29.8 29.8 0 0 0 22 12a29.8 29.8 0 0 0-.4-4.8ZM10 15.3V8.7l5.7 3.3L10 15.3Z" /></svg>
+                </span>
+                <span class="provider facebook" title="Facebook">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-9h3l.5-3.5h-3.5V7.2c0-1 .3-1.7 1.8-1.7h1.9V2.4c-.3 0-1.5-.1-2.8-.1-2.8 0-4.7 1.7-4.7 4.8v2.4H6.8V13h3.1v9h3.8Z" /></svg>
+                </span>
+            </div>
+        </div>
+
+        <EditForm Model="Request" OnValidSubmit="SubmitAsync">
+            <DataAnnotationsValidator />
+
+            <label class="sr-only" for="video-url">YouTube or Facebook video URL</label>
+            <div class="url-shell">
+                <span class="url-prefix" aria-hidden="true">URL</span>
+                <InputText id="video-url"
+                           class="url-input"
+                           @bind-Value="Request.Url"
+                           autocomplete="url"
+                           inputmode="url"
+                           spellcheck="false"
+                           placeholder="https://youtube.com/watch?v=..." />
+                <button class="paste-button" type="button" @onclick="PasteFromClipboardAsync" aria-label="Paste URL from clipboard">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h6m-6 0a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 0H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 8h6m-6 4h4" /></svg>
+                    Paste
+                </button>
+            </div>
+            <ValidationMessage For="@(() => Request.Url)" />
+
+            <div class="download-options">
+                <div class="field-group">
+                    <label for="kind">File type</label>
+                    <div class="select-wrap">
+                        <InputSelect id="kind" class="select-input" @bind-Value="Request.Kind">
+                            <option value="@DownloadKind.Video">MP4 video</option>
+                            <option value="@DownloadKind.Audio">MP3 audio</option>
+                        </InputSelect>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
+                    </div>
+                </div>
+                <div class="field-group">
+                    <label for="quality">Video quality</label>
+                    <div class="select-wrap">
+                        <InputSelect id="quality"
+                                     class="select-input"
+                                     @bind-Value="Request.Quality"
+                                     disabled="@(Request.Kind == DownloadKind.Audio)">
+                            <option value="360">360p · Compact</option>
+                            <option value="480">480p · Standard</option>
+                            <option value="720">720p · HD</option>
+                            <option value="1080">1080p · Full HD</option>
+                            <option value="best">Best available</option>
+                        </InputSelect>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
+                    </div>
+                </div>
+                <button class="download-button" type="submit" disabled="@IsSubmitting">
+                    @if (IsSubmitting)
+                    {
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span>Starting...</span>
+                    }
+                    else
+                    {
+                        <span>Analyze &amp; download</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
+                    }
+                </button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(FormError))
+            {
+                <div class="alert error" role="alert">@FormError</div>
+            }
+        </EditForm>
+
+        <div class="privacy-line">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 5v5.7c0 4.8 3.2 9.2 7.5 10.6 4.3-1.4 7.5-5.8 7.5-10.6V5L12 2Zm-1 13-3-3 1.4-1.4 1.6 1.6 3.6-3.6L16 10l-5 5Z" /></svg>
+            Downloaded files are stored temporarily and removed automatically.
+        </div>
+    </div>
+</section>
+
+<section class="trend-board" aria-labelledby="trending-title">
+    <div class="trend-board-copy">
+        <span class="section-label">POPULAR US SEARCHES</span>
+        <h2 id="trending-title">Built around what people actually search for.</h2>
+        <p>Clear paths for the most common video-saving tasks across the United States.</p>
+    </div>
+    <div class="trend-links">
+        <a href="#youtube-downloader"><span>01</span>YouTube video downloader</a>
+        <a href="#facebook-downloader"><span>02</span>Facebook video downloader</a>
+        <a href="#youtube-to-mp3"><span>03</span>YouTube to MP3</a>
+        <a href="#shorts-reels"><span>04</span>Shorts &amp; Reels downloader</a>
+        <a href="#how-it-works"><span>05</span>Download video online</a>
+    </div>
+</section>
+
+@if (Jobs.Count > 0)
+{
+    <section id="download-activity" class="jobs-section" aria-labelledby="jobs-title" aria-live="polite">
+        <div class="section-heading">
+            <div>
+                <span class="section-label">ACTIVE SESSION</span>
+                <h2 id="jobs-title">Download activity</h2>
+            </div>
+            <span class="job-count">@Jobs.Count recent request@(Jobs.Count == 1 ? string.Empty : "s")</span>
+        </div>
+
+        <div class="job-list">
+            @foreach (var job in Jobs)
+            {
+                <article id="@($"download-job-{job.Id:N}")"
+                         class="job-card @(job.Id == _lastSubmittedJobId ? "job-card-current" : null)"
+                         tabindex="-1">
+                    <div class="thumbnail-wrap">
+                        @if (!string.IsNullOrWhiteSpace(job.ThumbnailUrl))
+                        {
+                            <img src="@job.ThumbnailUrl" alt="Video thumbnail" loading="lazy" />
+                        }
+                        else
+                        {
+                            <div class="thumbnail-placeholder" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z" /></svg>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="job-body">
+                        <div class="job-topline">
+                            <div>
+                                <h3>@(job.Title ?? "Reading video details...")</h3>
+                                <p>@FormatJobMeta(job)</p>
+                            </div>
+                            <span class="status @StatusClass(job.Status)">@StatusText(job.Status)</span>
+                        </div>
+
+                        @if (job.Status is DownloadJobStatus.Downloading or DownloadJobStatus.Processing)
+                        {
+                            <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)Math.Round(job.Progress))">
+                                <div class="progress-value" style="@($"width: {Math.Clamp(job.Progress, 0, 100):0.##}%")"></div>
+                            </div>
+                            <div class="progress-meta">
+                                <strong>@job.Progress.ToString("0.0")%</strong>
+                                <span>@ProgressDetails(job)</span>
+                            </div>
+                        }
+
+                        @if (job.Status == DownloadJobStatus.Failed)
+                        {
+                            <div class="alert error compact">@job.ErrorMessage</div>
+                        }
+
+                        @if (job.Status == DownloadJobStatus.Completed)
+                        {
+                            <div class="completed-row">
+                                <span>Your file is ready and available for @RetentionText.</span>
+                                <a class="button primary small" href="@($"/downloads/{job.Id}")">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>
+                                    Save file
+                                </a>
+                            </div>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+<section id="how-it-works" class="process-section" aria-labelledby="how-title">
+    <div class="section-intro">
+        <span class="section-label">02 / HOW IT WORKS</span>
+        <h2 id="how-title">Three steps. No clutter.</h2>
+        <p>A lightweight workflow designed for creators, editors and social teams.</p>
+    </div>
+
+    <ol class="steps-grid">
+        <li>
+            <span class="step-index">01</span>
+            <div class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a4 4 0 0 0 5.7 0l2.1-2.1a4 4 0 0 0-5.7-5.7l-1.2 1.2m1.9 3.8a4 4 0 0 0-5.7 0l-2.1 2.1a4 4 0 0 0 5.7 5.7l1.2-1.2" /></svg></div>
+            <h3>Copy the link</h3>
+            <p>Open YouTube or Facebook, choose Share, then copy the public video URL.</p>
+        </li>
+        <li>
+            <span class="step-index">02</span>
+            <div class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM9 10h6m-6 4h4" /></svg></div>
+            <h3>Choose the output</h3>
+            <p>Paste the URL, select MP4 or MP3, then choose the quality you need.</p>
+        </li>
+        <li>
+            <span class="step-index">03</span>
+            <div class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg></div>
+            <h3>Save your file</h3>
+            <p>Track progress in real time and save the finished file to your device.</p>
+        </li>
+    </ol>
+</section>
+
+<section class="feature-band" aria-label="Product benefits">
+    <article>
+        <span class="feature-number">01</span>
+        <h3>Background processing</h3>
+        <p>Downloads run through a server-side queue so the Blazor interface stays responsive.</p>
+    </article>
+    <article>
+        <span class="feature-number">02</span>
+        <h3>Flexible formats</h3>
+        <p>Save MP4 video in multiple resolutions or extract clean MP3 audio.</p>
+    </article>
+    <article>
+        <span class="feature-number">03</span>
+        <h3>Privacy by default</h3>
+        <p>Completed files are retained for a limited period and removed automatically.</p>
+    </article>
+</section>
+
+<section class="seo-sections" aria-label="Video downloader guides">
+    <article id="youtube-downloader" class="seo-card seo-card-dark">
+        <div class="seo-card-head">
+            <span class="seo-platform youtube"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 7.2a2.8 2.8 0 0 0-2-2C17.9 4.7 12 4.7 12 4.7s-5.9 0-7.6.5a2.8 2.8 0 0 0-2 2A29.8 29.8 0 0 0 2 12a29.8 29.8 0 0 0 .4 4.8 2.8 2.8 0 0 0 2 2c1.7.5 7.6.5 7.6.5s5.9 0 7.6-.5a2.8 2.8 0 0 0 2-2A29.8 29.8 0 0 0 22 12a29.8 29.8 0 0 0-.4-4.8ZM10 15.3V8.7l5.7 3.3L10 15.3Z" /></svg></span>
+            <span class="section-label">YOUTUBE</span>
+        </div>
+        <h2>YouTube video downloader for MP4 and HD video</h2>
+        <p>Paste a standard YouTube link, a youtu.be URL or a YouTube Shorts link. Choose 360p, 480p, 720p, 1080p or the best available quality.</p>
+        <a href="#download">Download a YouTube video <span>→</span></a>
+    </article>
+
+    <article id="facebook-downloader" class="seo-card">
+        <div class="seo-card-head">
+            <span class="seo-platform facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-9h3l.5-3.5h-3.5V7.2c0-1 .3-1.7 1.8-1.7h1.9V2.4c-.3 0-1.5-.1-2.8-.1-2.8 0-4.7 1.7-4.7 4.8v2.4H6.8V13h3.1v9h3.8Z" /></svg></span>
+            <span class="section-label">FACEBOOK</span>
+        </div>
+        <h2>Facebook video downloader for public videos and Reels</h2>
+        <p>Save public Facebook videos and Reels from one URL field. Private, age-restricted or login-only content may require authorized server access.</p>
+        <a href="#download">Download a Facebook video <span>→</span></a>
+    </article>
+
+    <article id="youtube-to-mp3" class="seo-card">
+        <div class="seo-card-head">
+            <span class="seo-platform audio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l10-2v13M9 9l10-2M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm10-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /></svg></span>
+            <span class="section-label">AUDIO</span>
+        </div>
+        <h2>YouTube to MP3 converter for audio you can legally save</h2>
+        <p>Select MP3 audio to extract the soundtrack from accessible media. Only download audio you own or have permission to use.</p>
+        <a href="#download">Convert a link to MP3 <span>→</span></a>
+    </article>
+
+    <article id="shorts-reels" class="seo-card seo-card-accent">
+        <div class="seo-card-head">
+            <span class="seo-platform short"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5V7ZM4 4h16v16H4z" /></svg></span>
+            <span class="section-label">SHORT FORM</span>
+        </div>
+        <h2>YouTube Shorts and Facebook Reels downloader</h2>
+        <p>Use the same workflow for vertical short-form video. The tool recognizes supported Shorts and Reels URLs automatically.</p>
+        <a href="#download">Save a Short or Reel <span>→</span></a>
+    </article>
+</section>
+
+<section class="local-context" aria-labelledby="local-title">
+    <div>
+        <span class="section-label">US / LOS ANGELES</span>
+        <h2 id="local-title">A fast media utility for busy creative workflows.</h2>
+    </div>
+    <p>
+        Designed for creators, social media managers and production teams in Los Angeles and across the United States.
+        No location-specific tracking is required to use the downloader.
+    </p>
+</section>
+
+<section id="faq" class="faq-section" aria-labelledby="faq-title">
+    <div class="section-intro centered">
+        <span class="section-label">03 / FAQ</span>
+        <h2 id="faq-title">Video downloader questions</h2>
+        <p>Practical answers before you start a download.</p>
+    </div>
+
+    <div class="faq-list">
+        <details>
+            <summary>Can I use the same field for YouTube and Facebook links?</summary>
+            <p>Yes. The URL field automatically recognizes supported YouTube, youtu.be, Facebook and fb.watch domains.</p>
+        </details>
+        <details>
+            <summary>Does it support YouTube Shorts and Facebook Reels?</summary>
+            <p>Yes, when the video is publicly accessible and the platform allows the server to retrieve that URL.</p>
+        </details>
+        <details>
+            <summary>Why does a Facebook video sometimes fail?</summary>
+            <p>Private, regional, age-restricted or login-only videos may require cookies from an account that is authorized to view the content.</p>
+        </details>
+        <details>
+            <summary>How long is a completed file stored?</summary>
+            <p>Files are kept temporarily based on the server retention setting and are deleted automatically afterward.</p>
+        </details>
+        <details>
+            <summary>Is this downloader free to use?</summary>
+            <p>The web application is configured as a free utility. Your hosting provider may still charge you for bandwidth and server usage.</p>
+        </details>
+    </div>
+</section>
+
+<section class="legal-notice">
+    <div class="legal-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.3 3.8 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z" /></svg></div>
+    <div>
+        <strong>Respect copyright and platform rules</strong>
+        <p>Only download media you own, media you are authorized to save, or content distributed under a compatible license. This service does not bypass DRM, paywalls or platform access controls.</p>
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource _refreshCancellation = new();
+    private DownloadRequest Request { get; } = new();
+    private IReadOnlyList<DownloadJob> Jobs { get; set; } = Array.Empty<DownloadJob>();
+    private bool IsSubmitting { get; set; }
+    private string? FormError { get; set; }
+    private Guid? _pendingScrollJobId;
+    private Guid? _lastSubmittedJobId;
+    private const string RetentionText = "a few hours";
+
+    protected override void OnInitialized()
+    {
+        RefreshJobs();
+        _ = RefreshLoopAsync(_refreshCancellation.Token);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingScrollJobId is not Guid jobId)
+        {
+            return;
+        }
+
+        _pendingScrollJobId = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "videoDownloader.scrollToDownloadActivity",
+                $"download-job-{jobId:N}");
+        }
+        catch (JSException)
+        {
+            // The browser may disconnect while a Blazor Server circuit is closing.
+        }
+        catch (InvalidOperationException)
+        {
+            // JavaScript interop is unavailable during prerendering or shutdown.
+        }
+    }
+
+    private async Task PasteFromClipboardAsync()
+    {
+        FormError = null;
+
+        try
+        {
+            var clipboardText = await JS.InvokeAsync<string>("videoDownloader.readClipboard");
+            if (string.IsNullOrWhiteSpace(clipboardText))
+            {
+                FormError = "Your clipboard does not contain a video URL.";
+                return;
+            }
+
+            Request.Url = clipboardText;
+        }
+        catch
+        {
+            FormError = "Clipboard access was blocked. Press Ctrl + V or Command + V to paste the link.";
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        FormError = null;
+        IsSubmitting = true;
+
+        try
+        {
+            if (!UrlValidator.TryValidate(Request.Url, out var uri, out var error))
+            {
+                FormError = error;
+                return;
+            }
+
+            var quality = Request.Kind == DownloadKind.Audio ? "audio" : Request.Quality;
+            var job = JobStore.Create(uri!.AbsoluteUri, Request.Kind, quality);
+
+            try
+            {
+                await Queue.QueueAsync(job.Id);
+            }
+            catch
+            {
+                JobStore.Remove(job.Id);
+                throw;
+            }
+
+            Request.Url = string.Empty;
+            _lastSubmittedJobId = job.Id;
+            _pendingScrollJobId = job.Id;
+            RefreshJobs();
+        }
+        catch (Exception ex)
+        {
+            FormError = ex.Message;
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task RefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(() =>
+                {
+                    RefreshJobs();
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void RefreshJobs() => Jobs = JobStore.GetLatest();
+
+    private static string StatusText(DownloadJobStatus status) => status switch
+    {
+        DownloadJobStatus.Queued => "Queued",
+        DownloadJobStatus.ReadingMetadata => "Reading details",
+        DownloadJobStatus.Downloading => "Downloading",
+        DownloadJobStatus.Processing => "Processing",
+        DownloadJobStatus.Completed => "Ready",
+        DownloadJobStatus.Failed => "Failed",
+        _ => status.ToString()
+    };
+
+    private static string StatusClass(DownloadJobStatus status) => status switch
+    {
+        DownloadJobStatus.Completed => "success",
+        DownloadJobStatus.Failed => "danger",
+        DownloadJobStatus.Downloading or DownloadJobStatus.Processing => "active",
+        _ => "muted"
+    };
+
+    private static string FormatJobMeta(DownloadJob job)
+    {
+        var format = job.Kind == DownloadKind.Audio
+            ? "MP3"
+            : job.Quality == "best" ? "MP4 · Best available" : $"MP4 · {job.Quality}p";
+
+        if (job.DurationSeconds is null)
+        {
+            return format;
+        }
+
+        var duration = TimeSpan.FromSeconds(job.DurationSeconds.Value);
+        var text = duration.TotalHours >= 1
+            ? duration.ToString(@"h\:mm\:ss")
+            : duration.ToString(@"m\:ss");
+        return $"{format} · {text}";
+    }
+
+    private static string ProgressDetails(DownloadJob job)
+    {
+        var values = new[] { job.Speed, string.IsNullOrWhiteSpace(job.Eta) ? null : $"ETA {job.Eta}" }
+            .Where(x => !string.IsNullOrWhiteSpace(x));
+        var result = string.Join(" · ", values!);
+        return string.IsNullOrWhiteSpace(result)
+            ? (job.Status == DownloadJobStatus.Processing ? "Merging and converting your file" : "Downloading media data")
+            : result;
+    }
+
+    public void Dispose()
+    {
+        _refreshCancellation.Cancel();
+        _refreshCancellation.Dispose();
+    }
+}

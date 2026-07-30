@@ -1,0 +1,16 @@
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+    </Found>
+    <NotFound>
+        <PageTitle>Page not found | ClipCurrent</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="empty-state">
+                <span class="section-label">ERROR 404</span>
+                <h1>Lost link.</h1>
+                <p>The page you requested does not exist.</p>
+                <a class="button secondary" href="/">Return home</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

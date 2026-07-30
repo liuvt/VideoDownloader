@@ -1,0 +1,47 @@
+@inherits LayoutComponentBase
+
+<div class="site-shell">
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="/" aria-label="ClipCurrent home">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" role="img"><path d="M7 5h10M7 12h6M7 19h10M17 9l3 3-3 3" /></svg>
+                </span>
+                <span class="brand-copy">
+                    <strong>ClipCurrent</strong>
+                    <small>video utility</small>
+                </span>
+            </a>
+
+            <nav class="main-nav" aria-label="Primary navigation">
+                <a href="#download">Downloader</a>
+                <a href="#how-it-works">How it works</a>
+                <a href="#faq">FAQ</a>
+            </nav>
+
+            <a class="header-cta" href="#download">
+                <span>New download</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
+            </a>
+        </div>
+    </header>
+
+    <main class="content">
+        @Body
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="brand-mark mini" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M7 5h10M7 12h6M7 19h10M17 9l3 3-3 3" /></svg>
+                </span>
+                <div>
+                    <strong>ClipCurrent</strong>
+                    <p>Fast, focused media downloads.</p>
+                </div>
+            </div>
+            <p class="copyright">Use only with media you own or are authorized to download.</p>
+        </div>
+    </footer>
+</div>
