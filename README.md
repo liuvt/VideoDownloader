@@ -140,6 +140,7 @@ For private or login-required media, configure a protected Netscape cookie file 
 
 ## Fix Reconnect blazorserver “Rejoining the server…”.
 
+1. 
 ```C#
 <!-- Reconnect element hiden -->
     <div id="components-reconnect-modal"
@@ -179,5 +180,180 @@ For private or login-required media, configure a protected Netscape cookie file 
                 ];
             }
         }
+    });
+```
+
+2. Tạo wwwroot/js/blazor-reconnect.js
+
+```Js
+(function () {
+    "use strict";
+
+    let reconnecting = false;
+    let reloadScheduled = false;
+
+    function getReconnectModal() {
+        return document.getElementById("components-reconnect-modal");
+    }
+
+    function isDisconnected() {
+        const modal = getReconnectModal();
+
+        if (!modal) {
+            return false;
+        }
+
+        return (
+            modal.classList.contains("components-reconnect-show") ||
+            modal.classList.contains("components-reconnect-retrying") ||
+            modal.classList.contains("components-reconnect-failed") ||
+            modal.classList.contains("components-reconnect-rejected")
+        );
+    }
+
+    function scheduleReload(delay = 1200) {
+        if (reloadScheduled) {
+            return;
+        }
+
+        reloadScheduled = true;
+
+        window.setTimeout(function () {
+            window.location.reload();
+        }, delay);
+    }
+
+    async function reconnectOrReload() {
+        if (reconnecting || !isDisconnected()) {
+            return;
+        }
+
+        if (!window.Blazor || typeof window.Blazor.reconnect !== "function") {
+            scheduleReload();
+            return;
+        }
+
+        reconnecting = true;
+
+        try {
+            const connected = await window.Blazor.reconnect();
+
+            // false nghĩa là server không còn circuit cũ.
+            if (connected === false) {
+                scheduleReload();
+            }
+        } catch (error) {
+            console.debug("Blazor reconnect failed:", error);
+            scheduleReload();
+        } finally {
+            reconnecting = false;
+        }
+    }
+
+    function handleReconnectStateChanged(event) {
+        const state = event.detail?.state;
+
+        switch (state) {
+            case "failed":
+                reconnectOrReload();
+                break;
+
+            case "rejected":
+                // Circuit đã hết hạn hoặc server vừa restart.
+                scheduleReload(300);
+                break;
+
+            case "hide":
+                reconnecting = false;
+                reloadScheduled = false;
+                break;
+        }
+    }
+
+    function initialize() {
+        const modal = getReconnectModal();
+
+        if (modal) {
+            modal.addEventListener(
+                "components-reconnect-state-changed",
+                handleReconnectStateChanged
+            );
+        }
+
+        // Khi người dùng chuyển về tab.
+        document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === "visible") {
+                window.setTimeout(reconnectOrReload, 150);
+            }
+        });
+
+        // Một số trình duyệt mobile dùng pageshow khi khôi phục tab.
+        window.addEventListener("pageshow", function () {
+            window.setTimeout(reconnectOrReload, 150);
+        });
+
+        window.addEventListener("online", function () {
+            window.setTimeout(reconnectOrReload, 150);
+        });
+
+        window.addEventListener("focus", function () {
+            window.setTimeout(reconnectOrReload, 150);
+        });
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initialize);
+    } else {
+        initialize();
+    }
+})();
+```
+
+3. Ẩn popup bằng CSS
+
+```Css
+/* Không hiển thị popup Rejoining the server */
+#components-reconnect-modal,
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-retrying,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-rejected,
+#components-reconnect-modal.components-reconnect-paused,
+#components-reconnect-modal.components-reconnect-hide {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+```
+
+4. Sửa Program.cs
+
+```C#
+builder.Services
+    .AddServerSideBlazor(options =>
+    {
+        // Giữ trạng thái circuit lâu hơn khi người dùng chuyển tab.
+        options.DisconnectedCircuitRetentionPeriod =
+            TimeSpan.FromMinutes(15);
+
+        // Số circuit bị ngắt tối đa được giữ lại.
+        options.DisconnectedCircuitMaxRetained = 200;
+
+        options.JSInteropDefaultCallTimeout =
+            TimeSpan.FromMinutes(2);
+    })
+    .AddHubOptions(options =>
+    {
+        // Server đợi client lâu hơn trước khi xác định đã mất kết nối.
+        options.ClientTimeoutInterval =
+            TimeSpan.FromSeconds(60);
+
+        options.HandshakeTimeout =
+            TimeSpan.FromSeconds(30);
+
+        // Phải khớp với client: 15 giây.
+        options.KeepAliveInterval =
+            TimeSpan.FromSeconds(15);
     });
 ```

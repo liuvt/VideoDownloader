@@ -10,7 +10,35 @@ using VideoDownloader.Blazor.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
+
+// Giữ trạng thái circuit lâu hơn khi người dùng chuyển tab.
+builder.Services
+    .AddServerSideBlazor(options =>
+    {
+        // Giữ trạng thái circuit lâu hơn khi người dùng chuyển tab.
+        options.DisconnectedCircuitRetentionPeriod =
+            TimeSpan.FromMinutes(15);
+
+        // Số circuit bị ngắt tối đa được giữ lại.
+        options.DisconnectedCircuitMaxRetained = 200;
+
+        options.JSInteropDefaultCallTimeout =
+            TimeSpan.FromMinutes(2);
+    })
+    .AddHubOptions(options =>
+    {
+        // Server đợi client lâu hơn trước khi xác định đã mất kết nối.
+        options.ClientTimeoutInterval =
+            TimeSpan.FromSeconds(60);
+
+        options.HandshakeTimeout =
+            TimeSpan.FromSeconds(30);
+
+        // Phải khớp với client: 15 giây.
+        options.KeepAliveInterval =
+            TimeSpan.FromSeconds(15);
+    });
+
 builder.Services.AddResponseCompression(options =>
 {
     options.EnableForHttps = true;

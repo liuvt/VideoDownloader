@@ -4,3 +4,4 @@ obj/
 App_Data/
 *.user
 *.suo
+publish/
