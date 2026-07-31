@@ -20,7 +20,7 @@ public enum DownloadJobStatus
 
 public sealed class DownloadRequest
 {
-    [Required(ErrorMessage = "Enter a YouTube or Facebook video URL.")]
+    [Required(ErrorMessage = "Enter a supported video URL.")]
     [StringLength(2048, ErrorMessage = "The URL is too long.")]
     public string Url { get; set; } = string.Empty;
 

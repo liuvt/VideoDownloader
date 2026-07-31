@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Security;
+using System.Text;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Options;
@@ -88,24 +89,55 @@ app.UseRouting();
 app.MapGet("/robots.txt", (HttpContext context, IOptions<SiteOptions> options) =>
 {
     var origin = GetPublicOrigin(context, options.Value);
-    var content = $"User-agent: *\nAllow: /\nSitemap: {origin}/sitemap.xml\n";
+    var content = $"User-agent: *\nAllow: /\nDisallow: /downloads/\nSitemap: {origin}/sitemap.xml\n";
     return Results.Text(content, "text/plain; charset=utf-8");
 });
 
 app.MapGet("/sitemap.xml", (HttpContext context, IOptions<SiteOptions> options) =>
 {
-    var origin = SecurityElement.Escape(GetPublicOrigin(context, options.Value));
-    var content = $"""
-        <?xml version="1.0" encoding="UTF-8"?>
-        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-          <url>
-            <loc>{origin}/</loc>
-            <changefreq>weekly</changefreq>
-            <priority>1.0</priority>
-          </url>
-        </urlset>
-        """;
-    return Results.Text(content, "application/xml; charset=utf-8");
+    var origin = GetPublicOrigin(context, options.Value);
+    var lastModified = File.GetLastWriteTimeUtc(typeof(Program).Assembly.Location)
+        .ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    var pages = new[]
+    {
+        new SitemapPage("/", "daily", "1.0", true),
+        new SitemapPage("/youtube-video-downloader", "weekly", "0.9", false),
+        new SitemapPage("/facebook-video-downloader", "weekly", "0.9", false),
+        new SitemapPage("/tiktok-video-downloader", "weekly", "0.9", false),
+        new SitemapPage("/instagram-video-downloader", "weekly", "0.9", false),
+        new SitemapPage("/twitter-video-downloader", "weekly", "0.9", false)
+    };
+
+    var xml = new StringBuilder();
+    xml.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    xml.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:image=\"http://www.google.com/schemas/sitemap-image/1.1\">");
+
+    foreach (var page in pages)
+    {
+        var location = SecurityElement.Escape($"{origin}{page.Path}");
+        xml.AppendLine("  <url>");
+        xml.AppendLine($"    <loc>{location}</loc>");
+        xml.AppendLine($"    <lastmod>{lastModified}</lastmod>");
+        xml.AppendLine($"    <changefreq>{page.ChangeFrequency}</changefreq>");
+        xml.AppendLine($"    <priority>{page.Priority}</priority>");
+
+        if (page.IncludeSocialImage)
+        {
+            var imageLocation = SecurityElement.Escape($"{origin}/images/og-video-downloader.png");
+            xml.AppendLine("    <image:image>");
+            xml.AppendLine($"      <image:loc>{imageLocation}</image:loc>");
+            xml.AppendLine("      <image:title>Clip2Down online video downloader</image:title>");
+            xml.AppendLine("    </image:image>");
+        }
+
+        xml.AppendLine("  </url>");
+    }
+
+    xml.AppendLine("</urlset>");
+
+    context.Response.Headers.CacheControl = "public,max-age=3600";
+    return Results.Text(xml.ToString(), "application/xml; charset=utf-8");
 });
 
 app.MapGet("/downloads/{id:guid}", (
@@ -171,3 +203,5 @@ static string GetContentType(string path) =>
         ".wav" => "audio/wav",
         _ => "application/octet-stream"
     };
+
+internal sealed record SitemapPage(string Path, string ChangeFrequency, string Priority, bool IncludeSocialImage);

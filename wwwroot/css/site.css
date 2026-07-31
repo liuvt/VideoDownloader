@@ -194,6 +194,10 @@ kbd { padding: 4px 7px; border: 1px solid #484f58; border-bottom-width: 2px; bor
 .provider svg { width: 18px; height: 18px; fill: currentColor; }
 .provider.youtube { color: #ff0033; }
 .provider.facebook { color: #1877f2; }
+.provider-text { font-family: var(--font-mono); font-size: 10px; font-weight: 800; letter-spacing: -.04em; }
+.provider.tiktok { color: #111; box-shadow: inset 2px 0 #25f4ee, inset -2px 0 #fe2c55; }
+.provider.instagram { color: #c13584; background: linear-gradient(135deg, #fff, #fff5fa); }
+.provider.twitter { color: #fff; background: #111; border-color: #111; }
 
 .url-shell { min-height: 62px; border: 1px solid #8c959f; border-radius: 8px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 7px; background: #fff; box-shadow: 0 0 0 3px rgba(9,105,218,.08); transition: border-color .15s ease, box-shadow .15s ease; }
 .url-shell:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(9,105,218,.18); }
@@ -305,6 +309,10 @@ kbd { padding: 4px 7px; border: 1px solid #484f58; border-bottom-width: 2px; bor
 .seo-platform svg { width: 21px; height: 21px; fill: currentColor; }
 .seo-platform.youtube { color: #ff0033; }
 .seo-platform.facebook { color: #1877f2; }
+.seo-platform.platform-letter { font-family: var(--font-mono); font-size: 12px; font-weight: 900; }
+.seo-platform.tiktok { color: #111; box-shadow: inset 2px 0 #25f4ee, inset -2px 0 #fe2c55; }
+.seo-platform.instagram { color: #c13584; }
+.seo-platform.twitter { color: #fff; background: #111; border-color: #111; }
 .seo-platform.audio { color: var(--violet); }
 .seo-platform.short { color: var(--accent-dark); }
 .seo-card h2 { margin: 28px 0 0; color: var(--heading); font-size: 23px; line-height: 1.26; letter-spacing: -.03em; }
@@ -342,6 +350,9 @@ kbd { padding: 4px 7px; border: 1px solid #484f58; border-bottom-width: 2px; bor
 .footer-brand { display: flex; align-items: center; gap: 11px; }
 .footer-brand strong { color: var(--heading); font-size: 13px; }
 .footer-brand p, .copyright { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+.footer-links { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; }
+.footer-links a { color: #57606a; font-size: 10px; font-weight: 650; }
+.footer-links a:hover { color: var(--blue); text-decoration: underline; }
 .copyright { margin: 0; text-align: right; }
 .empty-state { padding: 120px 0; text-align: center; }
 .empty-state h1 { margin: 12px 0 0; color: var(--heading); font-size: 68px; letter-spacing: -.06em; }
@@ -425,4 +436,51 @@ kbd { padding: 4px 7px; border: 1px solid #484f58; border-bottom-width: 2px; bor
     visibility: hidden !important;
     opacity: 0 !important;
     pointer-events: none !important;
+}
+
+/* Platform SEO landing pages */
+.platform-page-hero {
+    max-width: 900px;
+    padding: 92px 0 54px;
+}
+.platform-page-kicker { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.platform-page-badge {
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 900;
+}
+.platform-page-badge.youtube { color: #ff0033; }
+.platform-page-badge.facebook { color: #1877f2; }
+.platform-page-badge.tiktok { color: #111; box-shadow: inset 3px 0 #25f4ee, inset -3px 0 #fe2c55; }
+.platform-page-badge.instagram { color: #c13584; background: linear-gradient(135deg, #fff, #fff5fa); }
+.platform-page-badge.twitter { color: #fff; background: #111; border-color: #111; }
+.platform-page-hero h1 { max-width: 880px; margin: 0; color: var(--heading); font-size: clamp(42px, 6vw, 68px); line-height: 1.02; letter-spacing: -.055em; }
+.platform-page-hero > p { max-width: 760px; margin: 24px 0 0; color: var(--muted); font-size: 17px; line-height: 1.75; }
+.platform-page-actions { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.button.secondary { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--heading); background: #fff; font-size: 12px; font-weight: 700; }
+.button.secondary:hover { background: var(--surface-subtle); }
+.platform-page-grid { margin-bottom: 72px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.platform-detail-card { min-height: 250px; padding: 28px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: var(--shadow-sm); }
+.platform-detail-card h2 { margin: 10px 0 12px; color: var(--heading); font-size: 24px; letter-spacing: -.035em; }
+.platform-detail-card p, .platform-detail-card li { color: var(--muted); font-size: 13px; line-height: 1.7; }
+.platform-detail-dark { color: #fff; background: var(--surface-dark); border-color: #30363d; }
+.platform-detail-dark h2 { color: #f0f6fc; }
+.platform-detail-dark p, .platform-detail-dark .section-label { color: #8c959f; }
+.platform-link-list, .platform-steps { margin: 18px 0 0; padding-left: 20px; }
+.platform-link-list li, .platform-steps li { margin: 8px 0; }
+.platform-link-list code { padding: 4px 7px; border: 1px solid var(--line-soft); border-radius: 5px; color: #24292f; background: var(--surface-subtle); font-family: var(--font-mono); font-size: 11px; }
+.platform-faq { margin-bottom: 80px; }
+
+@media (max-width: 760px) {
+    .platform-page-hero { padding-top: 58px; }
+    .platform-page-grid { grid-template-columns: 1fr; }
+    .platform-detail-card { min-height: auto; }
+    .footer-links { justify-content: flex-start; }
 }

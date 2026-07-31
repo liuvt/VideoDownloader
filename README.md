@@ -1,6 +1,6 @@
 # Clip2Down — Blazor Server Video Downloader
 
-A .NET 8 Blazor Server application that downloads accessible YouTube and Facebook media through `yt-dlp` and uses FFmpeg for merging and audio conversion.
+A .NET 9 Blazor Server application that downloads accessible YouTube, Facebook, TikTok, Instagram and X (Twitter) media through `yt-dlp` and uses FFmpeg for merging and audio conversion.
 
 > Download only media you own, media you are authorized to save, or content distributed under a compatible license. The application does not bypass DRM, paywalls or platform access controls.
 
@@ -11,7 +11,7 @@ A .NET 8 Blazor Server application that downloads accessible YouTube and Faceboo
 - Local system font stack matching GitHub Primer: Mona Sans when available, followed by Apple/Windows system fonts.
 - Monospace utility labels and terminal-style download preview.
 - Responsive layout for desktop and mobile.
-- SEO content for common US search intent: YouTube video downloader, Facebook video downloader, YouTube to MP3, YouTube Shorts downloader and Facebook Reels downloader.
+- SEO content for common US search intent: YouTube, Facebook, TikTok, Instagram and X video downloader search intent, plus YouTube to MP3, Shorts and Reels.
 - `en-US` HTML language, Open Graph locale and web manifest.
 - Canonical URL and `hreflang="en-US"`.
 - JSON-LD for `WebSite`, `WebApplication` and visible `FAQPage` content.
@@ -88,7 +88,7 @@ Set the real HTTPS origin before deployment. Do not leave `BaseUrl` empty behind
   "Site": {
     "Name": "Clip2Down",
     "BaseUrl": "https://your-domain.com",
-    "Description": "Download public YouTube videos, YouTube Shorts, Facebook videos and Reels as MP4 or MP3 with a fast online video downloader built for US users.",
+    "Description": "Download public YouTube, Facebook, TikTok, Instagram and X videos as MP4 or MP3 with a fast online downloader for US users.",
     "Language": "en-US"
   }
 }
@@ -135,8 +135,14 @@ For private or login-required media, configure a protected Netscape cookie file 
 - Store jobs in a database when history must survive restarts.
 - Run downloads in a dedicated worker for multi-instance deployment.
 - Keep `yt-dlp` updated because source platforms change frequently.
-- Review YouTube, Facebook, copyright and local legal requirements before opening the service publicly.
+- Review each supported platform, copyright and local legal requirements before opening the service publicly.
 
+
+## Release
+
+```
+dotnet publish .\VideoDownloader.Blazor.csproj -c Release -o .\publish
+```
 
 ## Fix Reconnect blazorserver “Rejoining the server…”.
 
@@ -357,3 +363,15 @@ builder.Services
             TimeSpan.FromSeconds(15);
     });
 ```
+
+## Supported platform hosts
+
+The URL allowlist accepts YouTube, Facebook, TikTok, Instagram and X/Twitter domains. Actual extraction depends on the installed yt-dlp version and whether the supplied media is publicly accessible.
+
+SEO landing routes included in `sitemap.xml`:
+
+- `/youtube-video-downloader`
+- `/facebook-video-downloader`
+- `/tiktok-video-downloader`
+- `/instagram-video-downloader`
+- `/twitter-video-downloader`

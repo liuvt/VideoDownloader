@@ -5,7 +5,7 @@
 @inject ProviderUrlValidator UrlValidator
 @inject IJSRuntime JS
 
-<PageTitle>YouTube & Facebook Video Downloader | Clip2Down</PageTitle>
+<PageTitle>YouTube, Facebook, TikTok & Instagram Downloader | Clip2Down</PageTitle>
 
 <section class="hero" aria-labelledby="hero-title">
     <div class="hero-grid">
@@ -17,7 +17,7 @@
 
             <h1 id="hero-title">Save the clip.<br /><span>Keep the momentum.</span></h1>
             <p class="hero-description">
-                A clean online video downloader for YouTube videos, Shorts, Facebook videos and Reels.
+                A clean online video downloader for YouTube, Facebook, TikTok, Instagram and X (Twitter).
                 Export MP4 or MP3 without installing another app.
             </p>
 
@@ -36,7 +36,7 @@
             </div>
             <div class="signal-body">
                 <div class="terminal-line"><span class="terminal-prompt">$</span> paste media URL</div>
-                <div class="terminal-result"><span>source</span><strong>YouTube · Facebook</strong></div>
+                <div class="terminal-result"><span>source</span><strong>YouTube · Facebook · TikTok · Instagram · X</strong></div>
                 <div class="terminal-result"><span>output</span><strong>MP4 · MP3</strong></div>
                 <div class="terminal-result"><span>quality</span><strong>360p → 1080p</strong></div>
                 <div class="terminal-progress"><i></i></div>
@@ -52,7 +52,7 @@
             <div>
                 <span class="section-label">01 / DOWNLOAD</span>
                 <h2 id="download-title">Paste a video link</h2>
-                <p>Use a public YouTube or Facebook URL.</p>
+                <p>Use a supported public YouTube, Facebook, TikTok, Instagram or X URL.</p>
             </div>
             <div class="provider-icons" aria-label="Supported platforms">
                 <span class="provider youtube" title="YouTube">
@@ -61,13 +61,16 @@
                 <span class="provider facebook" title="Facebook">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-9h3l.5-3.5h-3.5V7.2c0-1 .3-1.7 1.8-1.7h1.9V2.4c-.3 0-1.5-.1-2.8-.1-2.8 0-4.7 1.7-4.7 4.8v2.4H6.8V13h3.1v9h3.8Z" /></svg>
                 </span>
+                <span class="provider provider-text tiktok" title="TikTok">TT</span>
+                <span class="provider provider-text instagram" title="Instagram">IG</span>
+                <span class="provider provider-text twitter" title="X (Twitter)">X</span>
             </div>
         </div>
 
         <EditForm Model="Request" OnValidSubmit="SubmitAsync">
             <DataAnnotationsValidator />
 
-            <label class="sr-only" for="video-url">YouTube or Facebook video URL</label>
+            <label class="sr-only" for="video-url">Supported social video URL</label>
             <div class="url-shell">
                 <span class="url-prefix" aria-hidden="true">URL</span>
                 <InputText id="video-url"
@@ -76,7 +79,7 @@
                            autocomplete="url"
                            inputmode="url"
                            spellcheck="false"
-                           placeholder="https://youtube.com/watch?v=..." />
+                           placeholder="Paste a YouTube, TikTok, Instagram, Facebook or X link" />
                 <button class="paste-button" type="button" @onclick="PasteFromClipboardAsync" aria-label="Paste URL from clipboard">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h6m-6 0a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 0H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 8h6m-6 4h4" /></svg>
                     Paste
@@ -145,11 +148,11 @@
         <p>Clear paths for the most common video-saving tasks across the United States.</p>
     </div>
     <div class="trend-links">
-        <a href="#youtube-downloader"><span>01</span>YouTube video downloader</a>
-        <a href="#facebook-downloader"><span>02</span>Facebook video downloader</a>
-        <a href="#youtube-to-mp3"><span>03</span>YouTube to MP3</a>
-        <a href="#shorts-reels"><span>04</span>Shorts &amp; Reels downloader</a>
-        <a href="#how-it-works"><span>05</span>Download video online</a>
+        <a href="/youtube-video-downloader"><span>01</span>YouTube video downloader</a>
+        <a href="/facebook-video-downloader"><span>02</span>Facebook video downloader</a>
+        <a href="/tiktok-video-downloader"><span>03</span>TikTok video downloader</a>
+        <a href="/instagram-video-downloader"><span>04</span>Instagram Reels downloader</a>
+        <a href="/twitter-video-downloader"><span>05</span>X (Twitter) video downloader</a>
     </div>
 </section>
 
@@ -237,7 +240,7 @@
             <span class="step-index">01</span>
             <div class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a4 4 0 0 0 5.7 0l2.1-2.1a4 4 0 0 0-5.7-5.7l-1.2 1.2m1.9 3.8a4 4 0 0 0-5.7 0l-2.1 2.1a4 4 0 0 0 5.7 5.7l1.2-1.2" /></svg></div>
             <h3>Copy the link</h3>
-            <p>Open YouTube or Facebook, choose Share, then copy the public video URL.</p>
+            <p>Open the supported platform, choose Share, then copy the public video URL.</p>
         </li>
         <li>
             <span class="step-index">02</span>
@@ -272,7 +275,7 @@
     </article>
 </section>
 
-<section class="seo-sections" aria-label="Video downloader guides">
+<section id="platform-guides" class="seo-sections" aria-label="Video downloader guides">
     <article id="youtube-downloader" class="seo-card seo-card-dark">
         <div class="seo-card-head">
             <span class="seo-platform youtube"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 7.2a2.8 2.8 0 0 0-2-2C17.9 4.7 12 4.7 12 4.7s-5.9 0-7.6.5a2.8 2.8 0 0 0-2 2A29.8 29.8 0 0 0 2 12a29.8 29.8 0 0 0 .4 4.8 2.8 2.8 0 0 0 2 2c1.7.5 7.6.5 7.6.5s5.9 0 7.6-.5a2.8 2.8 0 0 0 2-2A29.8 29.8 0 0 0 22 12a29.8 29.8 0 0 0-.4-4.8ZM10 15.3V8.7l5.7 3.3L10 15.3Z" /></svg></span>
@@ -280,7 +283,7 @@
         </div>
         <h2>YouTube video downloader for MP4 and HD video</h2>
         <p>Paste a standard YouTube link, a youtu.be URL or a YouTube Shorts link. Choose 360p, 480p, 720p, 1080p or the best available quality.</p>
-        <a href="#download">Download a YouTube video <span>→</span></a>
+        <a href="/youtube-video-downloader">Open YouTube downloader guide <span>→</span></a>
     </article>
 
     <article id="facebook-downloader" class="seo-card">
@@ -290,7 +293,7 @@
         </div>
         <h2>Facebook video downloader for public videos and Reels</h2>
         <p>Save public Facebook videos and Reels from one URL field. Private, age-restricted or login-only content may require authorized server access.</p>
-        <a href="#download">Download a Facebook video <span>→</span></a>
+        <a href="/facebook-video-downloader">Open Facebook downloader guide <span>→</span></a>
     </article>
 
     <article id="youtube-to-mp3" class="seo-card">
@@ -308,9 +311,39 @@
             <span class="seo-platform short"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5V7ZM4 4h16v16H4z" /></svg></span>
             <span class="section-label">SHORT FORM</span>
         </div>
-        <h2>YouTube Shorts and Facebook Reels downloader</h2>
-        <p>Use the same workflow for vertical short-form video. The tool recognizes supported Shorts and Reels URLs automatically.</p>
-        <a href="#download">Save a Short or Reel <span>→</span></a>
+        <h2>Shorts, Reels and TikTok video downloader</h2>
+        <p>Use the same workflow for vertical short-form video from supported public links.</p>
+        <a href="#download">Save short-form media <span>→</span></a>
+    </article>
+
+    <article id="tiktok-downloader" class="seo-card">
+        <div class="seo-card-head">
+            <span class="seo-platform platform-letter tiktok">TT</span>
+            <span class="section-label">TIKTOK</span>
+        </div>
+        <h2>TikTok video downloader for public share links</h2>
+        <p>Paste a standard TikTok post URL or a vm.tiktok.com share link and export accessible media as MP4 or MP3.</p>
+        <a href="/tiktok-video-downloader">Open TikTok downloader guide <span>→</span></a>
+    </article>
+
+    <article id="instagram-downloader" class="seo-card">
+        <div class="seo-card-head">
+            <span class="seo-platform platform-letter instagram">IG</span>
+            <span class="section-label">INSTAGRAM</span>
+        </div>
+        <h2>Instagram video downloader for Reels and video posts</h2>
+        <p>Save accessible public Instagram Reels and video posts from supported instagram.com links.</p>
+        <a href="/instagram-video-downloader">Open Instagram downloader guide <span>→</span></a>
+    </article>
+
+    <article id="twitter-downloader" class="seo-card seo-card-dark">
+        <div class="seo-card-head">
+            <span class="seo-platform platform-letter twitter">X</span>
+            <span class="section-label">X / TWITTER</span>
+        </div>
+        <h2>X and Twitter video downloader for public status links</h2>
+        <p>Paste a public x.com or twitter.com status URL and save accessible video as MP4 or MP3.</p>
+        <a href="/twitter-video-downloader">Open X downloader guide <span>→</span></a>
     </article>
 </section>
 
@@ -334,12 +367,12 @@
 
     <div class="faq-list">
         <details>
-            <summary>Can I use the same field for YouTube and Facebook links?</summary>
-            <p>Yes. The URL field automatically recognizes supported YouTube, youtu.be, Facebook and fb.watch domains.</p>
+            <summary>Can I use the same field for every supported platform?</summary>
+            <p>Yes. The URL field recognizes supported YouTube, Facebook, TikTok, Instagram and X (Twitter) domains.</p>
         </details>
         <details>
-            <summary>Does it support YouTube Shorts and Facebook Reels?</summary>
-            <p>Yes, when the video is publicly accessible and the platform allows the server to retrieve that URL.</p>
+            <summary>Does it support Shorts, Reels, TikTok videos and X posts?</summary>
+            <p>Yes, when the media is publicly accessible and the platform allows the server to retrieve the supplied URL.</p>
         </details>
         <details>
             <summary>Why does a Facebook video sometimes fail?</summary>

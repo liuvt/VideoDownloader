@@ -1,0 +1,188 @@
+@page "/youtube-video-downloader"
+@page "/facebook-video-downloader"
+@page "/tiktok-video-downloader"
+@page "/instagram-video-downloader"
+@page "/twitter-video-downloader"
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Options.IOptions<SiteOptions> SiteOptionsAccessor
+
+<PageTitle>@Page.Title</PageTitle>
+<section class="platform-page-hero" aria-labelledby="platform-page-title">
+    <div class="platform-page-kicker">
+        <span class="platform-page-badge @Page.CssClass">@Page.Badge</span>
+        <span class="section-label">PLATFORM GUIDE</span>
+    </div>
+    <h1 id="platform-page-title">@Page.Heading</h1>
+    <p>@Page.Intro</p>
+    <div class="platform-page-actions">
+        <a class="download-button" href="/#download">Paste a @Page.DisplayName link</a>
+        <a class="button secondary" href="/">View all platforms</a>
+    </div>
+</section>
+
+<section class="platform-page-grid" aria-label="@Page.DisplayName download instructions">
+    <article class="platform-detail-card">
+        <span class="section-label">SUPPORTED LINKS</span>
+        <h2>Links Clip2Down can recognize</h2>
+        <ul class="platform-link-list">
+            @foreach (var link in Page.LinkExamples)
+            {
+                <li><code>@link</code></li>
+            }
+        </ul>
+    </article>
+
+    <article class="platform-detail-card platform-detail-dark">
+        <span class="section-label">OUTPUT</span>
+        <h2>MP4 video or MP3 audio</h2>
+        <p>Choose an available video quality from 360p through 1080p, use best available, or extract audio as MP3.</p>
+    </article>
+
+    <article class="platform-detail-card">
+        <span class="section-label">HOW TO</span>
+        <h2>Three quick steps</h2>
+        <ol class="platform-steps">
+            <li>Open the public @Page.DisplayName post and copy its share URL.</li>
+            <li>Paste the URL on the Clip2Down homepage and choose MP4 or MP3.</li>
+            <li>Wait for processing, then use the Save file button.</li>
+        </ol>
+    </article>
+
+    <article class="platform-detail-card">
+        <span class="section-label">ACCESS NOTE</span>
+        <h2>Public and authorized media only</h2>
+        <p>@Page.AccessNote</p>
+    </article>
+</section>
+
+<section class="platform-faq" aria-labelledby="platform-faq-title">
+    <div class="section-intro">
+        <span class="section-label">FAQ</span>
+        <h2 id="platform-faq-title">@Page.DisplayName downloader questions</h2>
+    </div>
+    <div class="faq-list">
+        <details>
+            <summary>Does Clip2Down remove watermarks or access controls?</summary>
+            <p>No. Clip2Down retrieves media that the server can access and doesn't bypass DRM, paywalls, private-account controls or other platform restrictions.</p>
+        </details>
+        <details>
+            <summary>Why can a valid link still fail?</summary>
+            <p>Platforms change frequently. A link may also be private, region-restricted, age-restricted, login-only or temporarily unsupported by the installed yt-dlp version.</p>
+        </details>
+        <details>
+            <summary>Can I download copyrighted media?</summary>
+            <p>Only download media you own, have permission to save, or may lawfully use under the applicable license and local rules.</p>
+        </details>
+    </div>
+</section>
+
+@code {
+    private PlatformSeoPage Page { get; set; } = PlatformSeoPage.YouTube;
+
+    private string CanonicalUrl
+    {
+        get
+        {
+            var baseUrl = SiteOptionsAccessor.Value.BaseUrl?.TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                baseUrl = new Uri(Navigation.Uri).GetLeftPart(UriPartial.Authority);
+            }
+
+            return $"{baseUrl}{Page.Path}";
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri)
+            .Split('?', '#')[0]
+            .Trim('/');
+        Page = PlatformSeoPage.All.TryGetValue(path, out var page)
+            ? page
+            : PlatformSeoPage.YouTube;
+    }
+
+    private sealed record PlatformSeoPage(
+        string Path,
+        string DisplayName,
+        string Badge,
+        string CssClass,
+        string Title,
+        string Description,
+        string Heading,
+        string Intro,
+        string AccessNote,
+        string[] LinkExamples)
+    {
+        public static readonly PlatformSeoPage YouTube = new(
+            "/youtube-video-downloader",
+            "YouTube",
+            "YT",
+            "youtube",
+            "YouTube Video Downloader – MP4 & MP3 | Clip2Down",
+            "Download accessible YouTube videos and Shorts as MP4 or MP3. Choose HD quality and save public media you are authorized to use.",
+            "YouTube video downloader for MP4, Shorts and MP3",
+            "Paste a standard YouTube watch link, a youtu.be share link or a YouTube Shorts URL. Clip2Down sends the job to yt-dlp and shows progress in your active session.",
+            "Private, members-only, age-restricted or region-restricted videos can require authorized cookies and may not be available.",
+            ["youtube.com/watch?v=…", "youtu.be/…", "youtube.com/shorts/…"]);
+
+        public static readonly PlatformSeoPage Facebook = new(
+            "/facebook-video-downloader",
+            "Facebook",
+            "FB",
+            "facebook",
+            "Facebook Video Downloader for Videos & Reels | Clip2Down",
+            "Download accessible public Facebook videos and Reels as MP4 or MP3 with a fast browser-based workflow.",
+            "Facebook video downloader for public videos and Reels",
+            "Use one field for public Facebook watch links, post videos and Reels. Choose MP4 or MP3 and follow the job in real time.",
+            "Private groups, friends-only posts, age restrictions and login-only videos may require authorized cookies or may not be downloadable.",
+            ["facebook.com/watch/?v=…", "facebook.com/reel/…", "fb.watch/…"]);
+
+        public static readonly PlatformSeoPage TikTok = new(
+            "/tiktok-video-downloader",
+            "TikTok",
+            "TT",
+            "tiktok",
+            "TikTok Video Downloader – Save Public TikTok Videos | Clip2Down",
+            "Download accessible public TikTok videos as MP4 or MP3 from standard and vm.tiktok.com share links.",
+            "TikTok video downloader for public posts and share links",
+            "Paste a public TikTok post URL or the vm.tiktok.com link created by the Share button. Clip2Down can export accessible media as MP4 or MP3.",
+            "Private accounts, removed posts, regional restrictions, login checks and platform changes can prevent extraction.",
+            ["tiktok.com/@creator/video/…", "vm.tiktok.com/…", "www.tiktok.com/t/…"]);
+
+        public static readonly PlatformSeoPage Instagram = new(
+            "/instagram-video-downloader",
+            "Instagram",
+            "IG",
+            "instagram",
+            "Instagram Video Downloader for Reels & Posts | Clip2Down",
+            "Download accessible public Instagram Reels and video posts as MP4 or MP3 from a supported link.",
+            "Instagram video downloader for public Reels and posts",
+            "Copy a public Instagram Reel or video-post URL and paste it into Clip2Down. The same workflow supports MP4 video and MP3 audio output.",
+            "Private accounts, Stories, login-only posts and restricted media may require authorized cookies or may not be available.",
+            ["instagram.com/reel/…", "instagram.com/p/…", "instagram.com/tv/…"]);
+
+        public static readonly PlatformSeoPage Twitter = new(
+            "/twitter-video-downloader",
+            "X (Twitter)",
+            "X",
+            "twitter",
+            "X (Twitter) Video Downloader – MP4 & MP3 | Clip2Down",
+            "Download accessible public videos from X and Twitter status links as MP4 or MP3.",
+            "X and Twitter video downloader for public status links",
+            "Paste a public x.com or twitter.com status URL. Clip2Down analyzes the media and provides available MP4 or MP3 output.",
+            "Protected accounts, deleted posts, sensitive-media gates and login requirements can prevent the server from retrieving media.",
+            ["x.com/username/status/…", "twitter.com/username/status/…"]);
+
+        public static readonly IReadOnlyDictionary<string, PlatformSeoPage> All =
+            new Dictionary<string, PlatformSeoPage>(StringComparer.OrdinalIgnoreCase)
+            {
+                [YouTube.Path] = YouTube,
+                [Facebook.Path] = Facebook,
+                [TikTok.Path] = TikTok,
+                [Instagram.Path] = Instagram,
+                [Twitter.Path] = Twitter
+            };
+    }
+}

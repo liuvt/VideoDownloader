@@ -6,6 +6,6 @@ public sealed class SiteOptions
 
     public string Name { get; set; } = "Clip2Down";
     public string BaseUrl { get; set; } = string.Empty;
-    public string Description { get; set; } = "Download public YouTube and Facebook videos as MP4 or MP3 with a fast online video downloader for US users.";
+    public string Description { get; set; } = "Download public YouTube, Facebook, TikTok, Instagram and X videos as MP4 or MP3 with a fast online downloader for US users.";
     public string Language { get; set; } = "en-US";
 }

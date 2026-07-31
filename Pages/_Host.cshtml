@@ -14,7 +14,22 @@
     var origin = string.IsNullOrWhiteSpace(site.BaseUrl)
         ? requestOrigin
         : site.BaseUrl.TrimEnd('/');
-    var canonicalUrl = $"{origin}/";
+    var normalizedPath = Request.Path.HasValue && Request.Path.Value != "/"
+        ? Request.Path.Value!.TrimEnd('/')
+        : "/";
+    var canonicalUrl = normalizedPath == "/" ? $"{origin}/" : $"{origin}{normalizedPath}";
+
+    var pageSeo = normalizedPath switch
+    {
+        "/youtube-video-downloader" => ("YouTube Video Downloader – MP4 & MP3 | Clip2Down", "Download accessible YouTube videos and Shorts as MP4 or MP3. Choose HD quality and save public media you are authorized to use."),
+        "/facebook-video-downloader" => ("Facebook Video Downloader for Videos & Reels | Clip2Down", "Download accessible public Facebook videos and Reels as MP4 or MP3 with a fast browser-based workflow."),
+        "/tiktok-video-downloader" => ("TikTok Video Downloader – Save Public TikTok Videos | Clip2Down", "Download accessible public TikTok videos as MP4 or MP3 from standard and vm.tiktok.com share links."),
+        "/instagram-video-downloader" => ("Instagram Video Downloader for Reels & Posts | Clip2Down", "Download accessible public Instagram Reels and video posts as MP4 or MP3 from a supported link."),
+        "/twitter-video-downloader" => ("X (Twitter) Video Downloader – MP4 & MP3 | Clip2Down", "Download accessible public videos from X and Twitter status links as MP4 or MP3."),
+        _ => ("YouTube, Facebook, TikTok & Instagram Downloader | Clip2Down", site.Description)
+    };
+    var pageTitle = pageSeo.Item1;
+    var pageDescription = pageSeo.Item2;
     var socialImageUrl = $"{origin}/images/og-video-downloader.png";
 
     var faqItems = new object[]
@@ -22,21 +37,21 @@
         new Dictionary<string, object?>
         {
             ["@type"] = "Question",
-            ["name"] = "Can I use the same field for YouTube and Facebook links?",
+            ["name"] = "Can I use the same field for every supported platform?",
             ["acceptedAnswer"] = new Dictionary<string, object?>
             {
                 ["@type"] = "Answer",
-                ["text"] = "Yes. The URL field automatically recognizes supported YouTube, youtu.be, Facebook and fb.watch domains."
+                ["text"] = "Yes. The URL field recognizes supported YouTube, Facebook, TikTok, Instagram and X (Twitter) domains."
             }
         },
         new Dictionary<string, object?>
         {
             ["@type"] = "Question",
-            ["name"] = "Does it support YouTube Shorts and Facebook Reels?",
+            ["name"] = "Does it support Shorts, Reels, TikTok videos and X posts?",
             ["acceptedAnswer"] = new Dictionary<string, object?>
             {
                 ["@type"] = "Answer",
-                ["text"] = "Yes, when the video is publicly accessible and the platform allows the server to retrieve that URL."
+                ["text"] = "Yes, when the media is publicly accessible and the platform allows the server to retrieve the supplied URL."
             }
         },
         new Dictionary<string, object?>
@@ -51,51 +66,70 @@
         }
     };
 
+    var graphItems = new List<object>
+    {
+        new Dictionary<string, object?>
+        {
+            ["@type"] = "WebSite",
+            ["@id"] = $"{origin}/#website",
+            ["url"] = $"{origin}/",
+            ["name"] = site.Name,
+            ["description"] = site.Description,
+            ["inLanguage"] = site.Language
+        },
+        new Dictionary<string, object?>
+        {
+            ["@type"] = "WebApplication",
+            ["@id"] = $"{origin}/#application",
+            ["name"] = site.Name,
+            ["alternateName"] = "Online Video Downloader",
+            ["url"] = $"{origin}/",
+            ["description"] = site.Description,
+            ["applicationCategory"] = "MultimediaApplication",
+            ["operatingSystem"] = "Any",
+            ["browserRequirements"] = "Requires JavaScript and a modern web browser",
+            ["inLanguage"] = site.Language,
+            ["areaServed"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "Country",
+                ["name"] = "United States"
+            },
+            ["offers"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "Offer",
+                ["price"] = "0",
+                ["priceCurrency"] = "USD"
+            }
+        },
+        new Dictionary<string, object?>
+        {
+            ["@type"] = "WebPage",
+            ["@id"] = $"{canonicalUrl}#webpage",
+            ["url"] = canonicalUrl,
+            ["name"] = pageTitle,
+            ["description"] = pageDescription,
+            ["inLanguage"] = site.Language,
+            ["isPartOf"] = new Dictionary<string, object?>
+            {
+                ["@id"] = $"{origin}/#website"
+            }
+        }
+    };
+
+    if (normalizedPath == "/")
+    {
+        graphItems.Add(new Dictionary<string, object?>
+        {
+            ["@type"] = "FAQPage",
+            ["@id"] = $"{canonicalUrl}#faq",
+            ["mainEntity"] = faqItems
+        });
+    }
+
     var structuredData = new Dictionary<string, object?>
     {
         ["@context"] = "https://schema.org",
-        ["@graph"] = new object[]
-        {
-            new Dictionary<string, object?>
-            {
-                ["@type"] = "WebSite",
-                ["@id"] = $"{origin}/#website",
-                ["url"] = canonicalUrl,
-                ["name"] = site.Name,
-                ["description"] = site.Description,
-                ["inLanguage"] = site.Language
-            },
-            new Dictionary<string, object?>
-            {
-                ["@type"] = "WebApplication",
-                ["@id"] = $"{origin}/#application",
-                ["name"] = site.Name,
-                ["alternateName"] = "Online Video Downloader",
-                ["url"] = canonicalUrl,
-                ["description"] = site.Description,
-                ["applicationCategory"] = "MultimediaApplication",
-                ["operatingSystem"] = "Any",
-                ["browserRequirements"] = "Requires JavaScript and a modern web browser",
-                ["inLanguage"] = site.Language,
-                ["areaServed"] = new Dictionary<string, object?>
-                {
-                    ["@type"] = "Country",
-                    ["name"] = "United States"
-                },
-                ["offers"] = new Dictionary<string, object?>
-                {
-                    ["@type"] = "Offer",
-                    ["price"] = "0",
-                    ["priceCurrency"] = "USD"
-                }
-            },
-            new Dictionary<string, object?>
-            {
-                ["@type"] = "FAQPage",
-                ["@id"] = $"{origin}/#faq",
-                ["mainEntity"] = faqItems
-            }
-        }
+        ["@graph"] = graphItems
     };
 
     var jsonLd = JsonSerializer.Serialize(structuredData);
@@ -110,7 +144,7 @@
 
     <component type="typeof(Microsoft.AspNetCore.Components.Web.HeadOutlet)" render-mode="ServerPrerendered" />
 
-    <meta name="description" content="@site.Description" />
+    <meta name="description" content="@pageDescription" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="@site.Name" />
@@ -129,19 +163,19 @@
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:site_name" content="@site.Name" />
-    <meta property="og:title" content="YouTube &amp; Facebook Video Downloader | Clip2Down" />
-    <meta property="og:description" content="@site.Description" />
+    <meta property="og:title" content="@pageTitle" />
+    <meta property="og:description" content="@pageDescription" />
     <meta property="og:url" content="@canonicalUrl" />
     <meta property="og:image" content="@socialImageUrl" />
     <meta property="og:image:secure_url" content="@socialImageUrl" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Clip2Down online YouTube and Facebook video downloader" />
+    <meta property="og:image:alt" content="Clip2Down online multi-platform video downloader" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="YouTube &amp; Facebook Video Downloader | Clip2Down" />
-    <meta name="twitter:description" content="@site.Description" />
+    <meta name="twitter:title" content="@pageTitle" />
+    <meta name="twitter:description" content="@pageDescription" />
     <meta name="twitter:image" content="@socialImageUrl" />
     <meta name="twitter:image:alt" content="Clip2Down online video downloader" />
 
@@ -161,7 +195,7 @@
     <script src="~/js/blazor-reconnect.js" asp-append-version="true"></script>
 
     <script src="js/site.js" asp-append-version="true"></script>
-    <script src="_framework/blazor.server.js"></script>
+    <script src="_framework/blazor.server.js" autostart="false"></script>
 
     <script>
     Blazor.start({
