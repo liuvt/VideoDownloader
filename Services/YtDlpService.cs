@@ -33,59 +33,82 @@ public sealed partial class YtDlpService
         var jobDirectory = Path.Combine(root, job.Id.ToString("N"));
         Directory.CreateDirectory(jobDirectory);
 
+        var useDirectFallback = false;
+
         job.Status = DownloadJobStatus.ReadingMetadata;
-        await ReadMetadataAsync(job, cancellationToken);
+        try
+        {
+            await ReadMetadataAsync(job, cancellationToken);
+        }
+        catch (Exception ex) when (CanUseDirectFallback(job.Url, ex))
+        {
+            useDirectFallback = true;
+            job.UsedDirectFallback = true;
+            job.Title ??= GetFallbackTitle(job.Url);
+
+            _logger.LogWarning(
+                ex,
+                "Metadata extraction failed for job {JobId}. Retrying with direct {Kind} fallback.",
+                job.Id,
+                job.Kind);
+        }
 
         job.Status = DownloadJobStatus.Downloading;
         job.Progress = 0;
+        job.Speed = null;
+        job.Eta = null;
 
         var outputTemplate = Path.Combine(jobDirectory, "media.%(ext)s");
-        var arguments = BuildDownloadArguments(job, outputTemplate);
-        string? finalPath = null;
-        var errors = new Queue<string>();
+        var primaryArguments = useDirectFallback
+            ? BuildDirectFallbackArguments(job, outputTemplate)
+            : BuildDownloadArguments(job, outputTemplate);
 
-        var exitCode = await RunProcessAsync(
-            arguments,
-            line =>
-            {
-                if (line.StartsWith("FILEPATH=", StringComparison.Ordinal))
-                {
-                    finalPath = line["FILEPATH=".Length..].Trim();
-                }
-
-                ParseProgress(job, line);
-            },
-            line =>
-            {
-                ParseProgress(job, line);
-                if (!string.IsNullOrWhiteSpace(line))
-                {
-                    errors.Enqueue(line.Trim());
-                    while (errors.Count > 12)
-                    {
-                        errors.Dequeue();
-                    }
-                }
-            },
+        var result = await RunDownloadAttemptAsync(
+            job,
+            primaryArguments,
             cancellationToken);
 
-        if (exitCode != 0)
+        if (result.ExitCode != 0 &&
+            !useDirectFallback &&
+            IsDirectFallbackPlatform(job.Url))
+        {
+            _logger.LogWarning(
+                "Primary yt-dlp attempt failed for job {JobId}. Running direct high-quality fallback. Error: {Error}",
+                job.Id,
+                result.ErrorText);
+
+            CleanupAttemptFiles(jobDirectory);
+
+            job.UsedDirectFallback = true;
+            job.Status = DownloadJobStatus.Downloading;
+            job.Progress = 0;
+            job.Speed = null;
+            job.Eta = null;
+
+            var fallbackArguments = BuildDirectFallbackArguments(job, outputTemplate);
+            result = await RunDownloadAttemptAsync(
+                job,
+                fallbackArguments,
+                cancellationToken);
+        }
+
+        if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                errors.Count == 0
-                    ? $"yt-dlp exited with code {exitCode}."
-                    : string.Join(Environment.NewLine, errors));
+                string.IsNullOrWhiteSpace(result.ErrorText)
+                    ? $"yt-dlp exited with code {result.ExitCode}."
+                    : result.ErrorText);
         }
 
         job.Status = DownloadJobStatus.Processing;
 
-        finalPath = ResolveFinalPath(finalPath, jobDirectory);
+        var finalPath = ResolveFinalPath(result.FinalPath, jobDirectory);
         if (finalPath is null)
         {
             throw new FileNotFoundException("The downloaded file could not be found.");
         }
 
-        var safeTitle = SanitizeFileName(job.Title ?? "video");
+        var safeTitle = SanitizeFileName(job.Title ?? GetFallbackTitle(job.Url));
         var extension = Path.GetExtension(finalPath);
         var destination = Path.Combine(jobDirectory, safeTitle + extension);
 
@@ -108,6 +131,45 @@ public sealed partial class YtDlpService
         job.Eta = null;
         job.Status = DownloadJobStatus.Completed;
         job.CompletedAt = DateTimeOffset.UtcNow;
+    }
+
+    private async Task<DownloadAttemptResult> RunDownloadAttemptAsync(
+        DownloadJob job,
+        IReadOnlyCollection<string> arguments,
+        CancellationToken cancellationToken)
+    {
+        string? finalPath = null;
+        var errors = new Queue<string>();
+
+        var exitCode = await RunProcessAsync(
+            arguments,
+            line =>
+            {
+                if (line.StartsWith("FILEPATH=", StringComparison.Ordinal))
+                {
+                    finalPath = line["FILEPATH=".Length..].Trim();
+                }
+
+                ParseProgress(job, line);
+            },
+            line =>
+            {
+                ParseProgress(job, line);
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    errors.Enqueue(line.Trim());
+                    while (errors.Count > 16)
+                    {
+                        errors.Dequeue();
+                    }
+                }
+            },
+            cancellationToken);
+
+        return new DownloadAttemptResult(
+            exitCode,
+            finalPath,
+            string.Join(Environment.NewLine, errors));
     }
 
     private async Task ReadMetadataAsync(DownloadJob job, CancellationToken cancellationToken)
@@ -160,19 +222,7 @@ public sealed partial class YtDlpService
 
     private List<string> BuildDownloadArguments(DownloadJob job, string outputTemplate)
     {
-        var arguments = new List<string>
-        {
-            "--no-config",
-            "--no-playlist",
-            "--newline",
-            "--max-filesize", _options.MaxVideoSize,
-            "--progress-template",
-            "download:PROGRESS=%(progress._percent_str)s|SPEED=%(progress._speed_str)s|ETA=%(progress._eta_str)s",
-            "--print", "after_move:FILEPATH=%(filepath)s",
-            "--output", outputTemplate
-        };
-
-        AddCookiesArgument(arguments);
+        var arguments = BuildCommonDownloadArguments(outputTemplate);
 
         if (job.Kind == DownloadKind.Audio)
         {
@@ -193,6 +243,56 @@ public sealed partial class YtDlpService
         }
 
         arguments.Add(job.Url);
+        return arguments;
+    }
+
+    private List<string> BuildDirectFallbackArguments(
+        DownloadJob job,
+        string outputTemplate)
+    {
+        var arguments = BuildCommonDownloadArguments(outputTemplate);
+
+        // This is intentionally a separate, one-time retry path. It mirrors:
+        // yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+        //        --merge-output-format mp4 URL
+        if (job.Kind == DownloadKind.Audio)
+        {
+            arguments.AddRange(new[]
+            {
+                "--format", "bestaudio/best",
+                "--extract-audio",
+                "--audio-format", "mp3",
+                "--audio-quality", "0"
+            });
+        }
+        else
+        {
+            arguments.AddRange(new[]
+            {
+                "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "--merge-output-format", "mp4"
+            });
+        }
+
+        arguments.Add(job.Url);
+        return arguments;
+    }
+
+    private List<string> BuildCommonDownloadArguments(string outputTemplate)
+    {
+        var arguments = new List<string>
+        {
+            "--no-config",
+            "--no-playlist",
+            "--newline",
+            "--max-filesize", _options.MaxVideoSize,
+            "--progress-template",
+            "download:PROGRESS=%(progress._percent_str)s|SPEED=%(progress._speed_str)s|ETA=%(progress._eta_str)s",
+            "--print", "after_move:FILEPATH=%(filepath)s",
+            "--output", outputTemplate
+        };
+
+        AddCookiesArgument(arguments);
         return arguments;
     }
 
@@ -331,6 +431,103 @@ public sealed partial class YtDlpService
             : normalized;
     }
 
+    private static bool CanUseDirectFallback(string url, Exception exception)
+    {
+        if (!IsDirectFallbackPlatform(url) || exception is OperationCanceledException)
+        {
+            return false;
+        }
+
+        // Retrying cannot fix a missing executable or an invalid server setup.
+        return !exception.Message.Contains(
+            "yt-dlp was not found",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDirectFallbackPlatform(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        var host = uri.Host.TrimEnd('.').ToLowerInvariant();
+        return IsHostOrSubdomain(host, "youtube.com") ||
+               host == "youtu.be" ||
+               IsHostOrSubdomain(host, "youtube-nocookie.com") ||
+               IsHostOrSubdomain(host, "facebook.com") ||
+               host == "fb.watch" ||
+               IsHostOrSubdomain(host, "tiktok.com") ||
+               IsHostOrSubdomain(host, "instagram.com") ||
+               host == "instagr.am" ||
+               IsHostOrSubdomain(host, "x.com") ||
+               IsHostOrSubdomain(host, "twitter.com");
+    }
+
+    private static bool IsHostOrSubdomain(string host, string domain) =>
+        host.Equals(domain, StringComparison.OrdinalIgnoreCase) ||
+        host.EndsWith('.' + domain, StringComparison.OrdinalIgnoreCase);
+
+    private static string GetFallbackTitle(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return "downloaded-media";
+        }
+
+        var host = uri.Host.ToLowerInvariant();
+        if (host.Contains("youtube", StringComparison.Ordinal) || host == "youtu.be")
+        {
+            return "YouTube video";
+        }
+
+        if (host.Contains("facebook", StringComparison.Ordinal) || host == "fb.watch")
+        {
+            return "Facebook video";
+        }
+
+        if (host.Contains("tiktok", StringComparison.Ordinal))
+        {
+            return "TikTok video";
+        }
+
+        if (host.Contains("instagram", StringComparison.Ordinal) || host == "instagr.am")
+        {
+            return "Instagram video";
+        }
+
+        if (host == "x.com" || host.EndsWith(".x.com", StringComparison.Ordinal) ||
+            host.Contains("twitter", StringComparison.Ordinal))
+        {
+            return "X video";
+        }
+
+        return "downloaded-media";
+    }
+
+    private void CleanupAttemptFiles(string jobDirectory)
+    {
+        if (!Directory.Exists(jobDirectory))
+        {
+            return;
+        }
+
+        foreach (var path in Directory.EnumerateFiles(jobDirectory))
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Could not remove partial file {Path} before direct fallback.",
+                    path);
+            }
+        }
+    }
+
     private static string GetVideoFormat(string quality) => quality switch
     {
         "360" => "bv*[height<=360]+ba/b[height<=360]/b",
@@ -422,6 +619,11 @@ public sealed partial class YtDlpService
 
         return null;
     }
+
+    private sealed record DownloadAttemptResult(
+        int ExitCode,
+        string? FinalPath,
+        string ErrorText);
 
     [GeneratedRegex(@"PROGRESS=\s*(?<percent>\d+(?:\.\d+)?)%\|SPEED=(?<speed>[^|]*)\|ETA=(?<eta>.*)$")]
     private static partial Regex ProgressRegex();

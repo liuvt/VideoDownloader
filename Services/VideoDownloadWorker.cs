@@ -31,13 +31,32 @@ public sealed class VideoDownloadWorker : BackgroundService
                 continue;
             }
 
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                stoppingToken,
+                _store.GetCancellationToken(job.Id));
+
             try
             {
-                await _downloader.DownloadAsync(job, stoppingToken);
+                await _downloader.DownloadAsync(job, linkedCancellation.Token);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
+            }
+            catch (OperationCanceledException)
+            {
+                // The browser session was closed. yt-dlp is killed through the
+                // linked token and the cleanup service removes partial files.
+                job.Status = DownloadJobStatus.Cancelled;
+                job.ErrorMessage = null;
+                job.Speed = null;
+                job.Eta = null;
+                job.CompletedAt = DateTimeOffset.UtcNow;
+
+                _logger.LogInformation(
+                    "Download job {JobId} was cancelled because session {SessionId} closed.",
+                    job.Id,
+                    job.SessionId);
             }
             catch (Exception ex)
             {

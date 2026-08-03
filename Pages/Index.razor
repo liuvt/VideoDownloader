@@ -4,6 +4,7 @@
 @inject IVideoDownloadQueue Queue
 @inject ProviderUrlValidator UrlValidator
 @inject IJSRuntime JS
+@inject IOptions<DownloaderOptions> DownloaderConfiguration
 
 <PageTitle>YouTube, Facebook, TikTok & Instagram Downloader | Clip2Down</PageTitle>
 
@@ -215,7 +216,9 @@
                         {
                             <div class="completed-row">
                                 <span>Your file is ready and available for @RetentionText.</span>
-                                <a class="button primary small" href="@($"/downloads/{job.Id}")">
+                                <a class="button primary small"
+                                   href="@($"/downloads/{job.Id}")"
+                                   download="@job.FileName">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>
                                     Save file
                                 </a>
@@ -399,13 +402,15 @@
 
 @code {
     private readonly CancellationTokenSource _refreshCancellation = new();
+    private readonly Guid _sessionId = Guid.NewGuid();
+    private int _sessionClosed;
     private DownloadRequest Request { get; } = new();
     private IReadOnlyList<DownloadJob> Jobs { get; set; } = Array.Empty<DownloadJob>();
     private bool IsSubmitting { get; set; }
     private string? FormError { get; set; }
     private Guid? _pendingScrollJobId;
     private Guid? _lastSubmittedJobId;
-    private const string RetentionText = "a few hours";
+    private const string RetentionText = "until this tab is closed";
 
     protected override void OnInitialized()
     {
@@ -415,6 +420,24 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync(
+                    "videoDownloader.registerSessionClose",
+                    _sessionId.ToString("N"));
+            }
+            catch (JSException)
+            {
+                // The browser may disconnect while a Blazor Server circuit is closing.
+            }
+            catch (InvalidOperationException)
+            {
+                // JavaScript interop is unavailable during prerendering or shutdown.
+            }
+        }
+
         if (_pendingScrollJobId is not Guid jobId)
         {
             return;
@@ -473,7 +496,11 @@
             }
 
             var quality = Request.Kind == DownloadKind.Audio ? "audio" : Request.Quality;
-            var job = JobStore.Create(uri!.AbsoluteUri, Request.Kind, quality);
+            var job = JobStore.Create(
+                _sessionId,
+                uri!.AbsoluteUri,
+                Request.Kind,
+                quality);
 
             try
             {
@@ -520,7 +547,7 @@
         }
     }
 
-    private void RefreshJobs() => Jobs = JobStore.GetLatest();
+    private void RefreshJobs() => Jobs = JobStore.GetLatest(_sessionId);
 
     private static string StatusText(DownloadJobStatus status) => status switch
     {
@@ -530,6 +557,7 @@
         DownloadJobStatus.Processing => "Processing",
         DownloadJobStatus.Completed => "Ready",
         DownloadJobStatus.Failed => "Failed",
+        DownloadJobStatus.Cancelled => "Cancelled",
         _ => status.ToString()
     };
 
@@ -537,6 +565,7 @@
     {
         DownloadJobStatus.Completed => "success",
         DownloadJobStatus.Failed => "danger",
+        DownloadJobStatus.Cancelled => "muted",
         DownloadJobStatus.Downloading or DownloadJobStatus.Processing => "active",
         _ => "muted"
     };
@@ -547,16 +576,18 @@
             ? "MP3"
             : job.Quality == "best" ? "MP4 · Best available" : $"MP4 · {job.Quality}p";
 
+        var fallback = job.UsedDirectFallback ? " · Direct fallback" : string.Empty;
+
         if (job.DurationSeconds is null)
         {
-            return format;
+            return format + fallback;
         }
 
         var duration = TimeSpan.FromSeconds(job.DurationSeconds.Value);
         var text = duration.TotalHours >= 1
             ? duration.ToString(@"h\:mm\:ss")
             : duration.ToString(@"m\:ss");
-        return $"{format} · {text}";
+        return $"{format} · {text}{fallback}";
     }
 
     private static string ProgressDetails(DownloadJob job)
@@ -564,13 +595,36 @@
         var values = new[] { job.Speed, string.IsNullOrWhiteSpace(job.Eta) ? null : $"ETA {job.Eta}" }
             .Where(x => !string.IsNullOrWhiteSpace(x));
         var result = string.Join(" · ", values!);
-        return string.IsNullOrWhiteSpace(result)
-            ? (job.Status == DownloadJobStatus.Processing ? "Merging and converting your file" : "Downloading media data")
-            : result;
+        if (!string.IsNullOrWhiteSpace(result))
+        {
+            return result;
+        }
+
+        if (job.Status == DownloadJobStatus.Processing)
+        {
+            return job.UsedDirectFallback
+                ? "Finalizing the direct fallback file"
+                : "Merging and converting your file";
+        }
+
+        return job.UsedDirectFallback
+            ? "Retrying with direct high-quality mode"
+            : "Downloading media data";
     }
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _sessionClosed, 1) == 0 &&
+            DownloaderConfiguration.Value.DeleteOnSessionClose)
+        {
+            var grace = TimeSpan.FromSeconds(Math.Clamp(
+                DownloaderConfiguration.Value.SessionCloseGraceSeconds,
+                0,
+                600));
+
+            JobStore.CloseSession(_sessionId, grace);
+        }
+
         _refreshCancellation.Cancel();
         _refreshCancellation.Dispose();
     }

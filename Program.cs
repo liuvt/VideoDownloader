@@ -140,6 +140,22 @@ app.MapGet("/sitemap.xml", (HttpContext context, IOptions<SiteOptions> options) 
     return Results.Text(xml.ToString(), "application/xml; charset=utf-8");
 });
 
+app.MapPost("/api/sessions/{sessionId:guid}/close", (
+    Guid sessionId,
+    DownloadJobStore store,
+    IOptions<DownloaderOptions> options) =>
+{
+    if (options.Value.DeleteOnSessionClose)
+    {
+        var grace = TimeSpan.FromSeconds(
+            Math.Clamp(options.Value.SessionCloseGraceSeconds, 0, 600));
+
+        store.CloseSession(sessionId, grace);
+    }
+
+    return Results.NoContent();
+});
+
 app.MapGet("/downloads/{id:guid}", (
     Guid id,
     HttpContext context,

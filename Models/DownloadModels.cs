@@ -15,7 +15,8 @@ public enum DownloadJobStatus
     Downloading,
     Processing,
     Completed,
-    Failed
+    Failed,
+    Cancelled
 }
 
 public sealed class DownloadRequest
@@ -32,6 +33,7 @@ public sealed class DownloadRequest
 public sealed class DownloadJob
 {
     public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid SessionId { get; init; }
     public required string Url { get; init; }
     public required DownloadKind Kind { get; init; }
     public required string Quality { get; init; }
@@ -46,6 +48,12 @@ public sealed class DownloadJob
     public string? ErrorMessage { get; set; }
     public string? FileName { get; set; }
     public string? FilePath { get; set; }
+    public bool UsedDirectFallback { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? CompletedAt { get; set; }
+
+    // Set when the browser session is closed. The cleanup worker removes the
+    // job directory after a short grace period so an in-progress file response
+    // can finish cleanly.
+    public DateTimeOffset? DeleteAfter { get; set; }
 }
