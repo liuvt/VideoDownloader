@@ -49,6 +49,7 @@ public sealed class VideoDownloadWorker : BackgroundService
                 // linked token and the cleanup service removes partial files.
                 job.Status = DownloadJobStatus.Cancelled;
                 job.ErrorMessage = null;
+                job.TechnicalError = null;
                 job.Speed = null;
                 job.Eta = null;
                 job.CompletedAt = DateTimeOffset.UtcNow;
@@ -62,15 +63,16 @@ public sealed class VideoDownloadWorker : BackgroundService
             {
                 _logger.LogError(ex, "Could not download media for job {JobId}", job.Id);
                 job.Status = DownloadJobStatus.Failed;
-                job.ErrorMessage = ToFriendlyMessage(ex);
+                job.ErrorMessage = "Unable to download this video. Please try another video or try again later.";
+                job.TechnicalError = ToTechnicalMessage(ex);
                 job.CompletedAt = DateTimeOffset.UtcNow;
             }
         }
     }
 
-    private static string ToFriendlyMessage(Exception ex)
+    private static string ToTechnicalMessage(Exception ex)
     {
         var message = ex.Message.Trim();
-        return message.Length <= 800 ? message : message[..800];
+        return message.Length <= 8000 ? message : message[..8000];
     }
 }

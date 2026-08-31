@@ -1,7 +1,7 @@
 {
   "name": "Clip2Down - Video Downloader",
   "short_name": "Clip2Down",
-  "description": "Download public YouTube, Facebook, TikTok, Instagram and X videos as MP4 or MP3.",
+  "description": "Download public YouTube, Facebook, TikTok, Instagram, X, Reddit and Threads videos as MP4 or MP3.",
   "lang": "en-US",
   "start_url": "/",
   "scope": "/",

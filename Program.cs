@@ -62,9 +62,15 @@ builder.Services.Configure<DownloaderOptions>(
 builder.Services.Configure<SiteOptions>(
     builder.Configuration.GetSection(SiteOptions.SectionName));
 
+builder.Services.AddHttpClient("ThreadsResolver", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+
 builder.Services.AddSingleton<DownloadJobStore>();
 builder.Services.AddSingleton<ProviderUrlValidator>();
 builder.Services.AddSingleton<IVideoDownloadQueue, VideoDownloadQueue>();
+builder.Services.AddSingleton<ThreadsMediaResolver>();
 builder.Services.AddSingleton<YtDlpService>();
 builder.Services.AddHostedService<VideoDownloadWorker>();
 builder.Services.AddHostedService<DownloadCleanupService>();
@@ -106,7 +112,9 @@ app.MapGet("/sitemap.xml", (HttpContext context, IOptions<SiteOptions> options) 
         new SitemapPage("/facebook-video-downloader", "weekly", "0.9", false),
         new SitemapPage("/tiktok-video-downloader", "weekly", "0.9", false),
         new SitemapPage("/instagram-video-downloader", "weekly", "0.9", false),
-        new SitemapPage("/twitter-video-downloader", "weekly", "0.9", false)
+        new SitemapPage("/twitter-video-downloader", "weekly", "0.9", false),
+        new SitemapPage("/reddit-video-downloader", "weekly", "0.9", false),
+        new SitemapPage("/threads-video-downloader", "weekly", "0.9", false)
     };
 
     var xml = new StringBuilder();

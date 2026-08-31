@@ -35,7 +35,7 @@ public sealed class ProviderUrlValidator
         var host = parsed.IdnHost.TrimEnd('.');
         if (!IsSupportedHost(host))
         {
-            error = "Supported links: YouTube, Facebook, TikTok, Instagram, and X (Twitter).";
+            error = "Supported links: YouTube, Facebook, TikTok, Instagram, X (Twitter), Reddit, and Threads.";
             return false;
         }
 
@@ -53,7 +53,11 @@ public sealed class ProviderUrlValidator
         IsHostOrSubdomain(host, "instagram.com") ||
         IsHostOrSubdomain(host, "instagr.am") ||
         IsHostOrSubdomain(host, "x.com") ||
-        IsHostOrSubdomain(host, "twitter.com");
+        IsHostOrSubdomain(host, "twitter.com") ||
+        IsHostOrSubdomain(host, "reddit.com") ||
+        IsHostOrSubdomain(host, "redd.it") ||
+        IsHostOrSubdomain(host, "threads.com") ||
+        IsHostOrSubdomain(host, "threads.net");
 
     private static bool IsHostOrSubdomain(string host, string rootDomain) =>
         host.Equals(rootDomain, StringComparison.OrdinalIgnoreCase) ||

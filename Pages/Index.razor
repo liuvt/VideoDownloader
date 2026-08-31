@@ -3,10 +3,11 @@
 @inject DownloadJobStore JobStore
 @inject IVideoDownloadQueue Queue
 @inject ProviderUrlValidator UrlValidator
+@inject YtDlpService MediaAnalyzer
 @inject IJSRuntime JS
 @inject IOptions<DownloaderOptions> DownloaderConfiguration
 
-<PageTitle>YouTube, Facebook, TikTok & Instagram Downloader | Clip2Down</PageTitle>
+<PageTitle>Free Online Video Downloader – MP4 & MP3 | Clip2Down</PageTitle>
 
 <section class="hero" aria-labelledby="hero-title">
     <div class="hero-grid">
@@ -16,10 +17,10 @@
                 <span class="region-chip">US · Los Angeles</span>
             </div>
 
-            <h1 id="hero-title">Save the clip.<br /><span>Keep the momentum.</span></h1>
+            <h1 id="hero-title">Free Online Video Downloader<br /><span>MP4 &amp; MP3 for social media clips.</span></h1>
             <p class="hero-description">
-                A clean online video downloader for YouTube, Facebook, TikTok, Instagram and X (Twitter).
-                Export MP4 or MP3 without installing another app.
+                Download accessible public videos from YouTube, Facebook, TikTok, Instagram, X (Twitter), Reddit and Threads.
+                Save supported links as MP4 video or extract MP3 audio online without installing another app.
             </p>
 
             <div class="hero-proof" aria-label="Product highlights">
@@ -37,9 +38,9 @@
             </div>
             <div class="signal-body">
                 <div class="terminal-line"><span class="terminal-prompt">$</span> paste media URL</div>
-                <div class="terminal-result"><span>source</span><strong>YouTube · Facebook · TikTok · Instagram · X</strong></div>
+                <div class="terminal-result"><span>source</span><strong>YouTube · Facebook · TikTok · Instagram · X · Reddit · Threads</strong></div>
                 <div class="terminal-result"><span>output</span><strong>MP4 · MP3</strong></div>
-                <div class="terminal-result"><span>quality</span><strong>360p → 1080p</strong></div>
+                <div class="terminal-result"><span>quality</span><strong>Auto-detected from source</strong></div>
                 <div class="terminal-progress"><i></i></div>
                 <div class="terminal-foot"><span>Ready for a new link</span><kbd>⌘ / Ctrl + V</kbd></div>
             </div>
@@ -53,7 +54,7 @@
             <div>
                 <span class="section-label">01 / DOWNLOAD</span>
                 <h2 id="download-title">Paste a video link</h2>
-                <p>Use a supported public YouTube, Facebook, TikTok, Instagram or X URL.</p>
+                <p>Use a supported public YouTube, Facebook, TikTok, Instagram, X, Reddit or Threads URL.</p>
             </div>
             <div class="provider-icons" aria-label="Supported platforms">
                 <span class="provider youtube" title="YouTube">
@@ -65,75 +66,97 @@
                 <span class="provider provider-text tiktok" title="TikTok">TT</span>
                 <span class="provider provider-text instagram" title="Instagram">IG</span>
                 <span class="provider provider-text twitter" title="X (Twitter)">X</span>
+                <span class="provider provider-text reddit" title="Reddit">R</span>
+                <span class="provider provider-text threads" title="Threads">@@</span>
             </div>
         </div>
 
-        <EditForm Model="Request" OnValidSubmit="SubmitAsync">
-            <DataAnnotationsValidator />
-
+        <div class="format-analyzer">
             <label class="sr-only" for="video-url">Supported social video URL</label>
             <div class="url-shell">
                 <span class="url-prefix" aria-hidden="true">URL</span>
-                <InputText id="video-url"
-                           class="url-input"
-                           @bind-Value="Request.Url"
-                           autocomplete="url"
-                           inputmode="url"
-                           spellcheck="false"
-                           placeholder="Paste a YouTube, TikTok, Instagram, Facebook or X link" />
+                <input id="video-url"
+                       class="url-input"
+                       value="@Request.Url"
+                       @oninput="HandleUrlInputAsync"
+                       @onkeydown="HandleUrlKeyDownAsync"
+                       autocomplete="url"
+                       inputmode="url"
+                       spellcheck="false"
+                       placeholder="Paste a YouTube, Reddit, Threads, TikTok, Instagram, Facebook or X link" />
                 <button class="paste-button" type="button" @onclick="PasteFromClipboardAsync" aria-label="Paste URL from clipboard">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h6m-6 0a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 0H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 8h6m-6 4h4" /></svg>
                     Paste
                 </button>
             </div>
-            <ValidationMessage For="@(() => Request.Url)" />
 
-            <div class="download-options">
-                <div class="field-group">
-                    <label for="kind">File type</label>
-                    <div class="select-wrap">
-                        <InputSelect id="kind" class="select-input" @bind-Value="Request.Kind">
-                            <option value="@DownloadKind.Video">MP4 video</option>
-                            <option value="@DownloadKind.Audio">MP3 audio</option>
-                        </InputSelect>
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
+            @if (IsAnalyzing)
+            {
+                <div class="analyzer-state" role="status" aria-live="polite">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <div>
+                        <strong>Checking available formats...</strong>
+                        <span>Only qualities reported by the source will appear.</span>
                     </div>
                 </div>
-                <div class="field-group">
-                    <label for="quality">Video quality</label>
-                    <div class="select-wrap">
-                        <InputSelect id="quality"
-                                     class="select-input"
-                                     @bind-Value="Request.Quality"
-                                     disabled="@(Request.Kind == DownloadKind.Audio)">
-                            <option value="360">360p · Compact</option>
-                            <option value="480">480p · Standard</option>
-                            <option value="720">720p · HD</option>
-                            <option value="1080">1080p · Full HD</option>
-                            <option value="best">Best available</option>
-                        </InputSelect>
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4" /></svg>
+            }
+
+            @if (Analysis is not null && !IsAnalyzing)
+            {
+                <section class="available-formats" aria-labelledby="available-formats-title">
+                    <div class="analysis-media">
+                        @if (!string.IsNullOrWhiteSpace(Analysis.ThumbnailUrl))
+                        {
+                            <img src="@Analysis.ThumbnailUrl" alt="Video thumbnail" loading="lazy" />
+                        }
+                        else
+                        {
+                            <span class="analysis-media-placeholder" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z" /></svg>
+                            </span>
+                        }
+                        <div>
+                            <span class="section-label">AVAILABLE FORMATS</span>
+                            <h3 id="available-formats-title">@Analysis.Title</h3>
+                            <p>@FormatAnalysisSummary(Analysis)</p>
+                        </div>
                     </div>
-                </div>
-                <button class="download-button" type="submit" disabled="@IsSubmitting">
-                    @if (IsSubmitting)
-                    {
-                        <span class="spinner" aria-hidden="true"></span>
-                        <span>Starting...</span>
-                    }
-                    else
-                    {
-                        <span>Analyze &amp; download</span>
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>
-                    }
-                </button>
-            </div>
+
+                    <div class="format-grid">
+                        @foreach (var format in Analysis.Formats)
+                        {
+                            <button type="button"
+                                    class="format-option @(format.Kind == DownloadKind.Audio ? "format-option-audio" : null)"
+                                    disabled="@(_startingFormatKey is not null)"
+                                    @onclick="() => StartDownloadAsync(format)">
+                                <span class="format-option-main">
+                                    <strong>@format.Label</strong>
+                                    <small>@format.Detail</small>
+                                </span>
+                                <span class="format-option-action">
+                                    @if (_startingFormatKey == format.Key)
+                                    {
+                                        <span class="spinner" aria-hidden="true"></span>
+                                        <span>Starting</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Download</span>
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>
+                                    }
+                                </span>
+                            </button>
+                        }
+                    </div>
+                    <p class="format-note">Clip2Down does not guess a resolution. If 720p or 1080p is not listed here, that quality was not reported for this link.</p>
+                </section>
+            }
 
             @if (!string.IsNullOrWhiteSpace(FormError))
             {
                 <div class="alert error" role="alert">@FormError</div>
             }
-        </EditForm>
+        </div>
 
         <div class="privacy-line">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 5v5.7c0 4.8 3.2 9.2 7.5 10.6 4.3-1.4 7.5-5.8 7.5-10.6V5L12 2Zm-1 13-3-3 1.4-1.4 1.6 1.6 3.6-3.6L16 10l-5 5Z" /></svg>
@@ -144,9 +167,9 @@
 
 <section class="trend-board" aria-labelledby="trending-title">
     <div class="trend-board-copy">
-        <span class="section-label">POPULAR US SEARCHES</span>
-        <h2 id="trending-title">Built around what people actually search for.</h2>
-        <p>Clear paths for the most common video-saving tasks across the United States.</p>
+        <span class="section-label">TRENDING DOWNLOAD TOOLS</span>
+        <h2 id="trending-title">Popular ways to download social videos.</h2>
+        <p>Jump directly to a focused downloader guide for the platform or format you need.</p>
     </div>
     <div class="trend-links">
         <a href="/youtube-video-downloader"><span>01</span>YouTube video downloader</a>
@@ -154,6 +177,12 @@
         <a href="/tiktok-video-downloader"><span>03</span>TikTok video downloader</a>
         <a href="/instagram-video-downloader"><span>04</span>Instagram Reels downloader</a>
         <a href="/twitter-video-downloader"><span>05</span>X (Twitter) video downloader</a>
+        <a href="/reddit-video-downloader"><span>06</span>Reddit video downloader</a>
+        <a href="/threads-video-downloader"><span>07</span>Threads video downloader</a>
+        <a href="/youtube-video-downloader"><span>08</span>YouTube Shorts downloader</a>
+        <a href="/facebook-video-downloader"><span>09</span>Facebook Reels downloader</a>
+        <a href="/instagram-video-downloader"><span>10</span>Instagram Reels downloader</a>
+        <a href="#youtube-to-mp3"><span>11</span>YouTube to MP3 converter</a>
     </div>
 </section>
 
@@ -209,7 +238,7 @@
 
                         @if (job.Status == DownloadJobStatus.Failed)
                         {
-                            <div class="alert error compact">@job.ErrorMessage</div>
+                            <div class="alert error compact">Unable to download this video. Please try another video or try again later.</div>
                         }
 
                         @if (job.Status == DownloadJobStatus.Completed)
@@ -249,7 +278,7 @@
             <span class="step-index">02</span>
             <div class="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM9 10h6m-6 4h4" /></svg></div>
             <h3>Choose the output</h3>
-            <p>Paste the URL, select MP4 or MP3, then choose the quality you need.</p>
+            <p>Paste the URL and Clip2Down automatically shows only the MP4 qualities and MP3 audio that the source reports.</p>
         </li>
         <li>
             <span class="step-index">03</span>
@@ -285,7 +314,7 @@
             <span class="section-label">YOUTUBE</span>
         </div>
         <h2>YouTube video downloader for MP4 and HD video</h2>
-        <p>Paste a standard YouTube link, a youtu.be URL or a YouTube Shorts link. Choose 360p, 480p, 720p, 1080p or the best available quality.</p>
+        <p>Paste a standard YouTube link, a youtu.be URL or a YouTube Shorts link. Clip2Down detects the available resolutions first, then shows only formats that can actually be requested.</p>
         <a href="/youtube-video-downloader">Open YouTube downloader guide <span>→</span></a>
     </article>
 
@@ -348,6 +377,26 @@
         <p>Paste a public x.com or twitter.com status URL and save accessible video as MP4 or MP3.</p>
         <a href="/twitter-video-downloader">Open X downloader guide <span>→</span></a>
     </article>
+
+    <article id="reddit-downloader" class="seo-card">
+        <div class="seo-card-head">
+            <span class="seo-platform platform-letter reddit">R</span>
+            <span class="section-label">REDDIT</span>
+        </div>
+        <h2>Reddit video downloader for public posts and share links</h2>
+        <p>Paste a public reddit.com post, v.redd.it media link or redd.it share link and save accessible video as MP4 or MP3.</p>
+        <a href="/reddit-video-downloader">Open Reddit downloader guide <span>→</span></a>
+    </article>
+
+    <article id="threads-downloader" class="seo-card seo-card-dark">
+        <div class="seo-card-head">
+            <span class="seo-platform platform-letter threads">@@</span>
+            <span class="section-label">THREADS</span>
+        </div>
+        <h2>Threads video downloader for public video posts</h2>
+        <p>Paste a public threads.com or threads.net post URL. Clip2Down resolves accessible video media and saves it as MP4 or extracts MP3 audio.</p>
+        <a href="/threads-video-downloader">Open Threads downloader guide <span>→</span></a>
+    </article>
 </section>
 
 <section class="local-context" aria-labelledby="local-title">
@@ -371,10 +420,10 @@
     <div class="faq-list">
         <details>
             <summary>Can I use the same field for every supported platform?</summary>
-            <p>Yes. The URL field recognizes supported YouTube, Facebook, TikTok, Instagram and X (Twitter) domains.</p>
+            <p>Yes. The URL field recognizes supported YouTube, Facebook, TikTok, Instagram, X (Twitter), Reddit and Threads domains.</p>
         </details>
         <details>
-            <summary>Does it support Shorts, Reels, TikTok videos and X posts?</summary>
+            <summary>Does it support Shorts, Reels, TikTok, X, Reddit and Threads posts?</summary>
             <p>Yes, when the media is publicly accessible and the platform allows the server to retrieve the supplied URL.</p>
         </details>
         <details>
@@ -406,10 +455,15 @@
     private int _sessionClosed;
     private DownloadRequest Request { get; } = new();
     private IReadOnlyList<DownloadJob> Jobs { get; set; } = Array.Empty<DownloadJob>();
-    private bool IsSubmitting { get; set; }
+    private MediaAnalysisResult? Analysis { get; set; }
+    private bool IsAnalyzing { get; set; }
+    private string? _startingFormatKey;
     private string? FormError { get; set; }
+    private CancellationTokenSource? _analysisCancellation;
+    private int _analysisVersion;
     private Guid? _pendingScrollJobId;
     private Guid? _lastSubmittedJobId;
+    private readonly HashSet<Guid> _consoleLoggedFailedJobs = new();
     private const string RetentionText = "until this tab is closed";
 
     protected override void OnInitialized()
@@ -474,33 +528,146 @@
                 return;
             }
 
-            Request.Url = clipboardText;
+            Request.Url = clipboardText.Trim();
+            await AnalyzeCurrentUrlAsync(delayMilliseconds: 0);
         }
-        catch
+        catch (JSException)
         {
             FormError = "Clipboard access was blocked. Press Ctrl + V or Command + V to paste the link.";
         }
     }
 
-    private async Task SubmitAsync()
+    private Task HandleUrlInputAsync(ChangeEventArgs args)
     {
+        Request.Url = args.Value?.ToString()?.Trim() ?? string.Empty;
+        Analysis = null;
         FormError = null;
-        IsSubmitting = true;
+        _startingFormatKey = null;
+
+        // Debounce typing/paste events so yt-dlp is not spawned for every keypress.
+        _ = AnalyzeCurrentUrlAsync(delayMilliseconds: 900);
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleUrlKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await AnalyzeCurrentUrlAsync(delayMilliseconds: 0);
+        }
+    }
+
+    private async Task AnalyzeCurrentUrlAsync(int delayMilliseconds)
+    {
+        // Cancel the previous yt-dlp analysis immediately. Do not dispose that
+        // source here because the previous task may still be unwinding from a
+        // CancellationToken registration inside Process.WaitForExitAsync.
+        _analysisCancellation?.Cancel();
+        _analysisCancellation = CancellationTokenSource.CreateLinkedTokenSource(_refreshCancellation.Token);
+
+        var token = _analysisCancellation.Token;
+        var version = Interlocked.Increment(ref _analysisVersion);
+        var url = Request.Url.Trim();
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            Analysis = null;
+            IsAnalyzing = false;
+            FormError = null;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
 
         try
         {
-            if (!UrlValidator.TryValidate(Request.Url, out var uri, out var error))
+            if (delayMilliseconds > 0)
             {
-                FormError = error;
+                await Task.Delay(delayMilliseconds, token);
+            }
+
+            if (!UrlValidator.TryValidate(url, out var uri, out var error))
+            {
+                if (version == _analysisVersion)
+                {
+                    Analysis = null;
+                    IsAnalyzing = false;
+                    FormError = error;
+                    await InvokeAsync(StateHasChanged);
+                }
                 return;
             }
 
-            var quality = Request.Kind == DownloadKind.Audio ? "audio" : Request.Quality;
+            if (version != _analysisVersion)
+            {
+                return;
+            }
+
+            IsAnalyzing = true;
+            FormError = null;
+            await InvokeAsync(StateHasChanged);
+
+            var result = await MediaAnalyzer.AnalyzeAsync(uri!.AbsoluteUri, token);
+
+            if (version == _analysisVersion)
+            {
+                Analysis = result;
+                FormError = null;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (version == _analysisVersion)
+            {
+                Analysis = null;
+                FormError = "Unable to read the available formats for this video. Please try another video or try again later.";
+
+                try
+                {
+                    await JS.InvokeVoidAsync(
+                        "videoDownloader.logDownloadError",
+                        "Format analysis failed",
+                        ex.ToString());
+                }
+                catch (JSException)
+                {
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+        }
+        finally
+        {
+            if (version == _analysisVersion)
+            {
+                IsAnalyzing = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task StartDownloadAsync(MediaFormatOption format)
+    {
+        if (Analysis is null || _startingFormatKey is not null)
+        {
+            return;
+        }
+
+        FormError = null;
+        _startingFormatKey = format.Key;
+
+        try
+        {
+            var analysis = Analysis;
             var job = JobStore.Create(
                 _sessionId,
-                uri!.AbsoluteUri,
-                Request.Kind,
-                quality);
+                analysis.SourceUrl,
+                format,
+                analysis);
 
             try
             {
@@ -512,18 +679,31 @@
                 throw;
             }
 
-            Request.Url = string.Empty;
             _lastSubmittedJobId = job.Id;
             _pendingScrollJobId = job.Id;
             RefreshJobs();
         }
         catch (Exception ex)
         {
-            FormError = ex.Message;
+            FormError = "Unable to start this download. Please try again later.";
+
+            try
+            {
+                await JS.InvokeVoidAsync(
+                    "videoDownloader.logDownloadError",
+                    "Download submit failed",
+                    ex.ToString());
+            }
+            catch (JSException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
         }
         finally
         {
-            IsSubmitting = false;
+            _startingFormatKey = null;
         }
     }
 
@@ -535,9 +715,10 @@
         {
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                await InvokeAsync(() =>
+                await InvokeAsync(async () =>
                 {
                     RefreshJobs();
+                    await LogNewFailuresToBrowserConsoleAsync();
                     StateHasChanged();
                 });
             }
@@ -548,6 +729,38 @@
     }
 
     private void RefreshJobs() => Jobs = JobStore.GetLatest(_sessionId);
+
+    private async Task LogNewFailuresToBrowserConsoleAsync()
+    {
+        foreach (var job in Jobs.Where(x => x.Status == DownloadJobStatus.Failed))
+        {
+            if (_consoleLoggedFailedJobs.Contains(job.Id))
+            {
+                continue;
+            }
+
+            var technicalError = string.IsNullOrWhiteSpace(job.TechnicalError)
+                ? "Download failed without additional technical details."
+                : job.TechnicalError;
+
+            try
+            {
+                await JS.InvokeVoidAsync(
+                    "videoDownloader.logDownloadError",
+                    $"Download failed [{job.Id:N}]",
+                    technicalError);
+                _consoleLoggedFailedJobs.Add(job.Id);
+            }
+            catch (JSException)
+            {
+                // Browser may disconnect while the circuit is closing.
+            }
+            catch (InvalidOperationException)
+            {
+                // JavaScript interop may be unavailable during prerendering/shutdown.
+            }
+        }
+    }
 
     private static string StatusText(DownloadJobStatus status) => status switch
     {
@@ -574,20 +787,26 @@
     {
         var format = job.Kind == DownloadKind.Audio
             ? "MP3"
-            : job.Quality == "best" ? "MP4 · Best available" : $"MP4 · {job.Quality}p";
-
-        var fallback = job.UsedDirectFallback ? " · Direct fallback" : string.Empty;
+            : $"MP4 · {job.Quality}";
 
         if (job.DurationSeconds is null)
         {
-            return format + fallback;
+            return format;
         }
 
         var duration = TimeSpan.FromSeconds(job.DurationSeconds.Value);
         var text = duration.TotalHours >= 1
             ? duration.ToString(@"h\:mm\:ss")
             : duration.ToString(@"m\:ss");
-        return $"{format} · {text}{fallback}";
+        return $"{format} · {text}";
+    }
+
+    private static string FormatAnalysisSummary(MediaAnalysisResult analysis)
+    {
+        var videoCount = analysis.Formats.Count(x => x.Kind == DownloadKind.Video);
+        var hasAudio = analysis.Formats.Any(x => x.Kind == DownloadKind.Audio);
+        var videoText = videoCount == 1 ? "1 video quality" : $"{videoCount} video qualities";
+        return hasAudio ? $"{videoText} · MP3 available" : videoText;
     }
 
     private static string ProgressDetails(DownloadJob job)
@@ -602,14 +821,10 @@
 
         if (job.Status == DownloadJobStatus.Processing)
         {
-            return job.UsedDirectFallback
-                ? "Finalizing the direct fallback file"
-                : "Merging and converting your file";
+            return "Finalizing your selected format";
         }
 
-        return job.UsedDirectFallback
-            ? "Retrying with direct high-quality mode"
-            : "Downloading media data";
+        return "Downloading the selected format";
     }
 
     public void Dispose()
@@ -625,6 +840,8 @@
             JobStore.CloseSession(_sessionId, grace);
         }
 
+        _analysisCancellation?.Cancel();
+        _analysisCancellation?.Dispose();
         _refreshCancellation.Cancel();
         _refreshCancellation.Dispose();
     }

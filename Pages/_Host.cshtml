@@ -21,12 +21,14 @@
 
     var pageSeo = normalizedPath switch
     {
-        "/youtube-video-downloader" => ("YouTube Video Downloader – MP4 & MP3 | Clip2Down", "Download accessible YouTube videos and Shorts as MP4 or MP3. Choose HD quality and save public media you are authorized to use."),
-        "/facebook-video-downloader" => ("Facebook Video Downloader for Videos & Reels | Clip2Down", "Download accessible public Facebook videos and Reels as MP4 or MP3 with a fast browser-based workflow."),
-        "/tiktok-video-downloader" => ("TikTok Video Downloader – Save Public TikTok Videos | Clip2Down", "Download accessible public TikTok videos as MP4 or MP3 from standard and vm.tiktok.com share links."),
-        "/instagram-video-downloader" => ("Instagram Video Downloader for Reels & Posts | Clip2Down", "Download accessible public Instagram Reels and video posts as MP4 or MP3 from a supported link."),
-        "/twitter-video-downloader" => ("X (Twitter) Video Downloader – MP4 & MP3 | Clip2Down", "Download accessible public videos from X and Twitter status links as MP4 or MP3."),
-        _ => ("YouTube, Facebook, TikTok & Instagram Downloader | Clip2Down", site.Description)
+        "/youtube-video-downloader" => ("Free YouTube Video Downloader Online | Clip2Down", "Free YouTube video downloader for accessible videos and Shorts. Save public media as MP4 in HD or extract MP3 audio online."),
+        "/facebook-video-downloader" => ("Free Facebook Video & Reels Downloader | Clip2Down", "Download accessible public Facebook videos and Reels online. Save supported Facebook video links as MP4 or extract MP3 audio."),
+        "/tiktok-video-downloader" => ("Free TikTok Video Downloader Online | Clip2Down", "Download accessible public TikTok videos online from standard and share links. Save supported TikTok media as MP4 or MP3."),
+        "/instagram-video-downloader" => ("Instagram Reels & Video Downloader Online | Clip2Down", "Download accessible public Instagram Reels and video posts online. Save supported Instagram media as MP4 or extract MP3 audio."),
+        "/twitter-video-downloader" => ("X (Twitter) Video Downloader Online | Clip2Down", "Download accessible public X and Twitter videos online from status links. Save supported media as MP4 or MP3."),
+        "/reddit-video-downloader" => ("Reddit Video Downloader Online – MP4 & MP3 | Clip2Down", "Download accessible public Reddit videos online from posts, redd.it shares and v.redd.it links as MP4 or MP3."),
+        "/threads-video-downloader" => ("Threads Video Downloader Online | Clip2Down", "Download accessible public Threads videos online from threads.com and threads.net post links. Save supported media as MP4 or MP3."),
+        _ => ("Free Online Video Downloader – MP4 & MP3 | Clip2Down", "Free online video downloader for YouTube, Facebook, TikTok, Instagram, X, Reddit and Threads. Save accessible public videos as MP4 or MP3.")
     };
     var pageTitle = pageSeo.Item1;
     var pageDescription = pageSeo.Item2;
@@ -41,13 +43,13 @@
             ["acceptedAnswer"] = new Dictionary<string, object?>
             {
                 ["@type"] = "Answer",
-                ["text"] = "Yes. The URL field recognizes supported YouTube, Facebook, TikTok, Instagram and X (Twitter) domains."
+                ["text"] = "Yes. The URL field recognizes supported YouTube, Facebook, TikTok, Instagram, X (Twitter), Reddit and Threads domains."
             }
         },
         new Dictionary<string, object?>
         {
             ["@type"] = "Question",
-            ["name"] = "Does it support Shorts, Reels, TikTok videos and X posts?",
+            ["name"] = "Does it support Shorts, Reels, TikTok, X, Reddit and Threads posts?",
             ["acceptedAnswer"] = new Dictionary<string, object?>
             {
                 ["@type"] = "Answer",
@@ -70,11 +72,25 @@
     {
         new Dictionary<string, object?>
         {
+            ["@type"] = "Organization",
+            ["@id"] = $"{origin}/#organization",
+            ["name"] = site.Name,
+            ["url"] = $"{origin}/",
+            ["logo"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "ImageObject",
+                ["url"] = $"{origin}/images/logo.png",
+                ["contentUrl"] = $"{origin}/images/logo.png"
+            }
+        },
+        new Dictionary<string, object?>
+        {
             ["@type"] = "WebSite",
             ["@id"] = $"{origin}/#website",
             ["url"] = $"{origin}/",
             ["name"] = site.Name,
             ["description"] = site.Description,
+            ["publisher"] = new Dictionary<string, object?> { ["@id"] = $"{origin}/#organization" },
             ["inLanguage"] = site.Language
         },
         new Dictionary<string, object?>
@@ -88,6 +104,16 @@
             ["applicationCategory"] = "MultimediaApplication",
             ["operatingSystem"] = "Any",
             ["browserRequirements"] = "Requires JavaScript and a modern web browser",
+            ["isAccessibleForFree"] = true,
+            ["featureList"] = new[]
+            {
+                "Online video downloader",
+                "MP4 video export",
+                "MP3 audio extraction",
+                "Automatic source format detection before download",
+                "YouTube, Facebook, TikTok, Instagram, X, Reddit and Threads URL support"
+            },
+            ["provider"] = new Dictionary<string, object?> { ["@id"] = $"{origin}/#organization" },
             ["inLanguage"] = site.Language,
             ["areaServed"] = new Dictionary<string, object?>
             {
@@ -120,9 +146,51 @@
     {
         graphItems.Add(new Dictionary<string, object?>
         {
+            ["@type"] = "ItemList",
+            ["@id"] = $"{canonicalUrl}#platforms",
+            ["name"] = "Online video downloader tools",
+            ["itemListElement"] = new object[]
+            {
+                new Dictionary<string, object?> { ["@type"] = "ListItem", ["position"] = 1, ["name"] = "YouTube Video Downloader", ["url"] = $"{origin}/youtube-video-downloader" },
+                new Dictionary<string, object?> { ["@type"] = "ListItem", ["position"] = 2, ["name"] = "Facebook Video Downloader", ["url"] = $"{origin}/facebook-video-downloader" },
+                new Dictionary<string, object?> { ["@type"] = "ListItem", ["position"] = 3, ["name"] = "TikTok Video Downloader", ["url"] = $"{origin}/tiktok-video-downloader" },
+                new Dictionary<string, object?> { ["@type"] = "ListItem", ["position"] = 4, ["name"] = "Instagram Reels Downloader", ["url"] = $"{origin}/instagram-video-downloader" },
+                new Dictionary<string, object?> { ["@type"] = "ListItem", ["position"] = 5, ["name"] = "X Twitter Video Downloader", ["url"] = $"{origin}/twitter-video-downloader" },
+                new Dictionary<string, object?> { ["@type"] = "ListItem", ["position"] = 6, ["name"] = "Reddit Video Downloader", ["url"] = $"{origin}/reddit-video-downloader" },
+                new Dictionary<string, object?> { ["@type"] = "ListItem", ["position"] = 7, ["name"] = "Threads Video Downloader", ["url"] = $"{origin}/threads-video-downloader" }
+            }
+        });
+
+        graphItems.Add(new Dictionary<string, object?>
+        {
             ["@type"] = "FAQPage",
             ["@id"] = $"{canonicalUrl}#faq",
             ["mainEntity"] = faqItems
+        });
+    }
+    else
+    {
+        graphItems.Add(new Dictionary<string, object?>
+        {
+            ["@type"] = "BreadcrumbList",
+            ["@id"] = $"{canonicalUrl}#breadcrumb",
+            ["itemListElement"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["@type"] = "ListItem",
+                    ["position"] = 1,
+                    ["name"] = "Clip2Down",
+                    ["item"] = $"{origin}/"
+                },
+                new Dictionary<string, object?>
+                {
+                    ["@type"] = "ListItem",
+                    ["position"] = 2,
+                    ["name"] = pageTitle,
+                    ["item"] = canonicalUrl
+                }
+            }
         });
     }
 
@@ -148,6 +216,8 @@
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="author" content="@site.Name" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="format-detection" content="telephone=no" />
     <meta name="application-name" content="@site.Name" />
     <meta http-equiv="content-language" content="en-US" />
     <meta name="theme-color" content="#0d1117" />
@@ -156,9 +226,10 @@
     <link rel="canonical" href="@canonicalUrl" />
     <link rel="alternate" hreflang="en-US" href="@canonicalUrl" />
     <link rel="alternate" hreflang="x-default" href="@canonicalUrl" />
-    <link rel="manifest" href="site.webmanifest" />
-    <link rel="icon" type="image/svg+xml" href="images/favicon.svg" />
-    <link rel="apple-touch-icon" href="images/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+    <link rel="icon" href="/images/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
 
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="en_US" />

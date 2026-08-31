@@ -11,15 +11,20 @@ public sealed class DownloadJobStore : IDisposable
     public DownloadJob Create(
         Guid sessionId,
         string url,
-        DownloadKind kind,
-        string quality)
+        MediaFormatOption format,
+        MediaAnalysisResult analysis)
     {
         var job = new DownloadJob
         {
             SessionId = sessionId,
             Url = url,
-            Kind = kind,
-            Quality = quality
+            Kind = format.Kind,
+            Quality = format.QualityLabel,
+            FormatSelector = format.FormatSelector,
+            MetadataResolved = true,
+            Title = analysis.Title,
+            ThumbnailUrl = analysis.ThumbnailUrl,
+            DurationSeconds = analysis.DurationSeconds
         };
 
         _jobs[job.Id] = job;

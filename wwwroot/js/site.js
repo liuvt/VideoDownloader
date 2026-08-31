@@ -1,4 +1,11 @@
 window.videoDownloader = {
+    logDownloadError: function (title, detail) {
+        // Technical downloader details intentionally go to DevTools only.
+        // They are never inserted into the DOM or shown in Download activity.
+        console.groupCollapsed(`[Clip2Down] ${title || "Download error"}`);
+        console.error(detail || "Unknown download error");
+        console.groupEnd();
+    },
     _sessionId: null,
     _sessionHandlerRegistered: false,
     _sessionCloseSent: false,
