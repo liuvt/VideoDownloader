@@ -15,6 +15,8 @@ public sealed class DownloaderOptions
     public bool FacebookPreferCookies { get; set; } = true;
     public string InstagramProxy { get; set; } = string.Empty;
     public string FacebookProxy { get; set; } = string.Empty;
+    public bool TikTokForceIPv4 { get; set; } = true;
+    public string TikTokImpersonate { get; set; } = "chrome-136:macos-15";
     public int AnalysisCacheMinutes { get; set; } = 15;
     public int InstagramRateLimitCooldownSeconds { get; set; } = 600;
     public int ThreadsResolveCacheMinutes { get; set; } = 10;

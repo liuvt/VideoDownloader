@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_ROOT="${1:-/www/wwwroot/VideoDownloader.Blazor}"
+APP_ROOT="${1:-/var/www/clip2down}"
 APP_USER="${APP_USER:-www-data}"
 APP_GROUP="${APP_GROUP:-www-data}"
 

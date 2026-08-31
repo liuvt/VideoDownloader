@@ -67,10 +67,16 @@ builder.Services.AddHttpClient("ThreadsResolver", client =>
     client.Timeout = TimeSpan.FromSeconds(20);
 });
 
+builder.Services.AddHttpClient("FacebookStoryResolver", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+
 builder.Services.AddSingleton<DownloadJobStore>();
 builder.Services.AddSingleton<ProviderUrlValidator>();
 builder.Services.AddSingleton<IVideoDownloadQueue, VideoDownloadQueue>();
 builder.Services.AddSingleton<ThreadsMediaResolver>();
+builder.Services.AddSingleton<FacebookStoryResolver>();
 builder.Services.AddSingleton<YtDlpService>();
 builder.Services.AddHostedService<VideoDownloadWorker>();
 builder.Services.AddHostedService<DownloadCleanupService>();

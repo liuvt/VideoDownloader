@@ -4,8 +4,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/www/wwwroot/VideoDownloader.Blazor
-ExecStart=/usr/bin/dotnet /www/wwwroot/VideoDownloader.Blazor/VideoDownloader.Blazor.dll --urls http://127.0.0.1:4123
+WorkingDirectory=/var/www/clip2down
+ExecStart=/usr/bin/dotnet /var/www/clip2down/VideoDownloader.Blazor.dll
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
@@ -13,10 +13,11 @@ SyslogIdentifier=videodownloader
 User=www-data
 Group=www-data
 Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:4123
 Environment=DOTNET_NOLOGO=true
 Environment=HOME=/var/www
-Environment=XDG_CACHE_HOME=/www/wwwroot/VideoDownloader.Blazor/App_Data/cache
-Environment=DENO_DIR=/www/wwwroot/VideoDownloader.Blazor/App_Data/cache/deno
+Environment=XDG_CACHE_HOME=/var/www/clip2down/App_Data/cache
+Environment=DENO_DIR=/var/www/clip2down/App_Data/cache/deno
 
 [Install]
 WantedBy=multi-user.target

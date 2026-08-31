@@ -16,6 +16,7 @@ public sealed partial class YtDlpService
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<YtDlpService> _logger;
     private readonly ThreadsMediaResolver _threadsResolver;
+    private readonly FacebookStoryResolver _facebookStoryResolver;
     private readonly ConcurrentDictionary<string, AnalysisCacheEntry> _analysisCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _instagramAnalyzeGate = new(1, 1);
     private readonly object _instagramCooldownLock = new();
@@ -25,12 +26,14 @@ public sealed partial class YtDlpService
         IOptions<DownloaderOptions> options,
         IWebHostEnvironment environment,
         ILogger<YtDlpService> logger,
-        ThreadsMediaResolver threadsResolver)
+        ThreadsMediaResolver threadsResolver,
+        FacebookStoryResolver facebookStoryResolver)
     {
         _options = options.Value;
         _environment = environment;
         _logger = logger;
         _threadsResolver = threadsResolver;
+        _facebookStoryResolver = facebookStoryResolver;
     }
 
     public async Task<MediaAnalysisResult> AnalyzeAsync(
@@ -188,6 +191,7 @@ public sealed partial class YtDlpService
         var effectiveUrl = ResolveFacebookExtractorInput(sourceUrl) ?? sourceUrl;
         string? referer = null;
         ThreadsMedia? threadsMedia = null;
+        FacebookStoryMedia? facebookStoryMedia = null;
 
         if (!string.Equals(effectiveUrl, sourceUrl, StringComparison.Ordinal))
         {
@@ -195,6 +199,20 @@ public sealed partial class YtDlpService
                 "Resolved Facebook URL {SourceUrl} to extractor input {EffectiveUrl}.",
                 sourceUrl,
                 effectiveUrl);
+        }
+
+        if (_facebookStoryResolver.IsFacebookStoryUrl(sourceUrl))
+        {
+            facebookStoryMedia = await _facebookStoryResolver.TryResolveAsync(sourceUrl, cancellationToken);
+            if (facebookStoryMedia is not null)
+            {
+                effectiveUrl = facebookStoryMedia.MediaUrl;
+                referer = facebookStoryMedia.Referer;
+
+                _logger.LogInformation(
+                    "Resolved Facebook Story {SourceUrl} to a direct Meta CDN media URL.",
+                    sourceUrl);
+            }
         }
 
         if (_threadsResolver.IsThreadsUrl(sourceUrl))
@@ -248,6 +266,25 @@ public sealed partial class YtDlpService
 
         if (exitCode != 0)
         {
+            if (facebookStoryMedia is not null)
+            {
+                return new MediaAnalysisResult(
+                    sourceUrl,
+                    facebookStoryMedia.Title,
+                    facebookStoryMedia.ThumbnailUrl,
+                    null,
+                    new[]
+                    {
+                        new MediaFormatOption(
+                            "video-original",
+                            DownloadKind.Video,
+                            "Original MP4",
+                            "Story source quality",
+                            "Original",
+                            "best")
+                    });
+            }
+
             if (threadsMedia is not null)
             {
                 return new MediaAnalysisResult(
@@ -284,8 +321,8 @@ public sealed partial class YtDlpService
 
         return new MediaAnalysisResult(
             sourceUrl,
-            threadsMedia?.Title ?? GetString(root, "title") ?? GetFallbackTitle(sourceUrl),
-            threadsMedia?.ThumbnailUrl ?? GetString(root, "thumbnail"),
+            facebookStoryMedia?.Title ?? threadsMedia?.Title ?? GetString(root, "title") ?? GetFallbackTitle(sourceUrl),
+            facebookStoryMedia?.ThumbnailUrl ?? threadsMedia?.ThumbnailUrl ?? GetString(root, "thumbnail"),
             GetInt64(root, "duration"),
             formats);
     }
@@ -301,6 +338,7 @@ public sealed partial class YtDlpService
         var useDirectFallback = false;
         var effectiveUrl = ResolveFacebookExtractorInput(job.Url) ?? job.Url;
         string? referer = null;
+        FacebookStoryMedia? facebookStoryMedia = null;
 
         if (!string.Equals(effectiveUrl, job.Url, StringComparison.Ordinal))
         {
@@ -309,6 +347,25 @@ public sealed partial class YtDlpService
                 job.Url,
                 effectiveUrl,
                 job.Id);
+        }
+
+        if (_facebookStoryResolver.IsFacebookStoryUrl(job.Url))
+        {
+            facebookStoryMedia = await _facebookStoryResolver.TryResolveAsync(job.Url, cancellationToken);
+            if (facebookStoryMedia is not null)
+            {
+                effectiveUrl = facebookStoryMedia.MediaUrl;
+                referer = facebookStoryMedia.Referer;
+                job.Title ??= facebookStoryMedia.Title;
+                job.ThumbnailUrl ??= facebookStoryMedia.ThumbnailUrl;
+                useDirectFallback = true;
+                job.UsedDirectFallback = true;
+
+                _logger.LogInformation(
+                    "Resolved Facebook Story {SourceUrl} to a direct Meta CDN media URL for job {JobId}.",
+                    job.Url,
+                    job.Id);
+            }
         }
 
         if (_threadsResolver.IsThreadsUrl(job.Url))
@@ -686,6 +743,18 @@ public sealed partial class YtDlpService
 
     private void AddPlatformCompatibilityArguments(List<string> arguments, string sourceUrl)
     {
+        if (IsTikTokUrl(sourceUrl))
+        {
+            var impersonate = _options.TikTokImpersonate?.Trim();
+            if (!string.IsNullOrWhiteSpace(impersonate))
+            {
+                arguments.Add("--impersonate");
+                arguments.Add(impersonate);
+            }
+
+            return;
+        }
+
         if (!_options.YouTubeCompatibilityMode || !IsYouTubeUrl(sourceUrl))
         {
             return;
@@ -721,6 +790,11 @@ public sealed partial class YtDlpService
 
     private void AddPlatformNetworkArguments(List<string> arguments, string sourceUrl)
     {
+        if (IsTikTokUrl(sourceUrl) && _options.TikTokForceIPv4)
+        {
+            arguments.Add("-4");
+        }
+
         string? proxy = null;
 
         if (IsInstagramUrl(sourceUrl))
@@ -1174,6 +1248,19 @@ public sealed partial class YtDlpService
                IsHostOrSubdomain(host, "youtube-nocookie.com");
     }
 
+    private static bool IsTikTokUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        var host = uri.Host.TrimEnd('.').ToLowerInvariant();
+        return IsHostOrSubdomain(host, "tiktok.com") ||
+               host == "vm.tiktok.com" ||
+               host == "vt.tiktok.com";
+    }
+
     private static string? ResolveFacebookExtractorInput(string sourceUrl)
     {
         if (!Uri.TryCreate(sourceUrl, UriKind.Absolute, out var uri))
@@ -1200,15 +1287,45 @@ public sealed partial class YtDlpService
             return $"facebook:{segments[1]}";
         }
 
+        // Some story share URLs include the actual story/video id in the query.
+        foreach (var queryName in new[] { "story_fbid", "story_id", "video_id" })
+        {
+            var queryValue = GetQueryParameter(uri, queryName);
+            if (!string.IsNullOrWhiteSpace(queryValue) &&
+                long.TryParse(queryValue, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+            {
+                return $"facebook:{queryValue}";
+            }
+        }
+
         var storiesIndex = Array.FindIndex(
             segments,
             segment => segment.Equals("stories", StringComparison.OrdinalIgnoreCase));
 
-        if (storiesIndex < 0 || storiesIndex + 2 >= segments.Length)
+        if (storiesIndex < 0)
         {
             return null;
         }
 
+        // Legacy Facebook story links can be /stories/<story-id>. yt-dlp does not
+        // register the /stories route, but its Facebook extractor accepts facebook:<id>.
+        if (storiesIndex + 2 >= segments.Length)
+        {
+            if (storiesIndex + 1 < segments.Length &&
+                long.TryParse(
+                    Uri.UnescapeDataString(segments[storiesIndex + 1]),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out _))
+            {
+                return $"facebook:{Uri.UnescapeDataString(segments[storiesIndex + 1])}";
+            }
+
+            return null;
+        }
+
+        // Newer shared story links are commonly /stories/<owner>/<opaque-token>.
+        // The opaque token can be base64/base64url and often ends in the media id.
         var storyToken = Uri.UnescapeDataString(segments[storiesIndex + 2]);
 
         if (long.TryParse(storyToken, NumberStyles.None, CultureInfo.InvariantCulture, out _))
@@ -1222,14 +1339,37 @@ public sealed partial class YtDlpService
             return null;
         }
 
-        var idMatch = Regex.Match(
+        var idMatches = Regex.Matches(
             decoded,
-            @"(?<id>\d{8,})$",
+            @"(?<id>\d{8,})",
             RegexOptions.CultureInvariant);
 
-        return idMatch.Success
-            ? $"facebook:{idMatch.Groups["id"].Value}"
+        return idMatches.Count > 0
+            ? $"facebook:{idMatches[idMatches.Count - 1].Groups["id"].Value}"
             : null;
+    }
+
+    private static string? GetQueryParameter(Uri uri, string name)
+    {
+        if (string.IsNullOrWhiteSpace(uri.Query))
+        {
+            return null;
+        }
+
+        foreach (var pair in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = pair.IndexOf('=');
+            var key = separator >= 0 ? pair[..separator] : pair;
+            if (!Uri.UnescapeDataString(key).Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var value = separator >= 0 ? pair[(separator + 1)..] : string.Empty;
+            return Uri.UnescapeDataString(value.Replace('+', ' '));
+        }
+
+        return null;
     }
 
     private static string? TryDecodeFacebookStoryToken(string token)

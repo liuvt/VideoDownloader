@@ -563,3 +563,45 @@ sudo bash deploy/prepare-runtime-directories.sh
 sudo systemctl restart videodownloader
 sudo systemctl status videodownloader --no-pager -l
 ```
+
+## TikTok + Facebook Stories production fix (2026-08-31)
+
+### TikTok
+The Linux production build now adds `-4` and `--impersonate chrome-136:macos-15`
+for TikTok analysis, metadata reads and downloads. The deployment updater installs
+`yt-dlp_linux` from the nightly builds because that binary bundles `curl_cffi`.
+Verify after deployment:
+
+```bash
+/usr/local/bin/yt-dlp --list-impersonate-targets
+```
+
+Chrome targets must be available (not marked `unavailable`).
+
+### Facebook 24-hour Stories
+Facebook Reels keep using the normal yt-dlp Facebook extractor. Story URLs are
+handled separately so the working Reels path is not changed. The Story resolver:
+
+1. prefers `cookies/facebook.txt` when present;
+2. follows Facebook story/share redirects;
+3. reads hydrated page JSON for `browser_native_hd_url`, `playable_url_quality_hd`,
+   `playable_url` and related Meta fields;
+4. accepts only direct `fbcdn.net` / `cdninstagram.com` video URLs;
+5. re-resolves the Story again at download time so temporary signed CDN URLs are fresh;
+6. falls back to `facebook:<id>` for story URLs/tokens where a numeric media id can be recovered.
+
+Facebook Stories often require an authenticated browser session even when Reels
+work anonymously. Export a current Netscape-format cookie file to:
+
+```text
+/var/www/clip2down/cookies/facebook.txt
+```
+
+Then secure it:
+
+```bash
+sudo chown www-data:www-data /var/www/clip2down/cookies/facebook.txt
+sudo chmod 600 /var/www/clip2down/cookies/facebook.txt
+```
+
+Do not commit or publish the cookie file.
