@@ -1,0 +1,783 @@
+@page "/convert-mp3"
+@using System.Globalization
+@inject AudioToolService AudioToolService
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Multi MP3 Editor – Cut, Merge, Speed, Volume & White Noise | Clip2Down</PageTitle>
+
+<section class="platform-page-hero audio-page-hero" aria-labelledby="audio-page-title">
+    <div class="platform-page-kicker">
+        <span class="platform-page-badge audio">MP3</span>
+        <span class="section-label">MULTI MP3 EDITOR</span>
+    </div>
+    <h1 id="audio-page-title">Edit everything on one page</h1>
+    <p>Upload 1–10 MP3 files, cut or keep sections on each timeline, reorder and merge them, then change volume and playback speed before exporting one finished MP3.</p>
+    <div class="audio-hero-proof">
+        <span>1–10 MP3 files</span>
+        <span>Multi-cut timeline</span>
+        <span>Keep one section</span>
+        <span>Volume + speed</span>
+        <span>FFmpeg on VPS</span>
+    </div>
+</section>
+
+<section class="audio-multi-workspace" aria-label="Multi MP3 editor">
+    <div class="audio-multi-panel">
+        <div class="audio-tool-panel-head audio-multi-head">
+            <div>
+                <span class="section-label">01 · SOURCE & TIMELINE</span>
+                <h2>Upload and edit MP3 files</h2>
+                <p>Use one file for a normal edit, or add up to @AudioToolService.MaxMergeFiles files. Each file can keep the full audio, remove multiple red areas, or keep only one green area.</p>
+            </div>
+            <span class="audio-ffmpeg-badge">FFmpeg</span>
+        </div>
+
+        <div class="audio-upload-zone audio-multi-upload">
+            <InputFile id="audio-source-input" OnChange="HandleFilesSelected" accept=".mp3,audio/mpeg" multiple />
+            <div class="audio-upload-copy">
+                <strong>Choose 1–@AudioToolService.MaxMergeFiles MP3 files</strong>
+                <span>Maximum @FormatBytes(AudioToolService.MaxUploadBytes) per file. Files are processed in the order shown below.</span>
+            </div>
+        </div>
+
+        @if (_selectedFiles.Count == 0)
+        {
+            <div class="audio-multi-empty">
+                <strong>One workspace for every MP3 task</strong>
+                <span>Remove sections · Keep a section · Merge files · Change volume · Change speed</span>
+            </div>
+        }
+        else
+        {
+            <div class="audio-multi-summary">
+                <span><b>@_selectedFiles.Count</b> file@(_selectedFiles.Count == 1 ? string.Empty : "s")</span>
+                <span><b>@TotalCutCount</b> cut area@(TotalCutCount == 1 ? string.Empty : "s")</span>
+                <span><b>@KeepModeCount</b> keep-only file@(KeepModeCount == 1 ? string.Empty : "s")</span>
+            </div>
+
+            <div class="audio-merge-editor audio-timeline-editor audio-multi-file-list" aria-label="MP3 timelines">
+                @for (var i = 0; i < _selectedFiles.Count; i++)
+                {
+                    var fileIndex = i;
+                    var selected = _selectedFiles[fileIndex];
+                    var activeCut = GetActiveCut(selected);
+                    <article class="audio-merge-file-card timeline-card multi-file-card @(selected.Mode == FileEditMode.Keep ? "keep-file-mode" : null)">
+                        <div class="audio-merge-file-head multi-file-head">
+                            <span class="audio-file-order">@(fileIndex + 1)</span>
+                            <div class="audio-file-copy">
+                                <strong>@selected.File.Name</strong>
+                                <small>
+                                    @FormatBytes(selected.File.Size)
+                                    @if (selected.DurationSeconds > 0)
+                                    {
+                                        <text> · @FormatTimelineTime(selected.DurationSeconds)</text>
+                                    }
+                                    <text> · @EditSummary(selected)</text>
+                                </small>
+                            </div>
+                            <div class="audio-file-actions">
+                                <button type="button" title="Move up" disabled="@(fileIndex == 0)" @onclick="() => MoveFile(fileIndex, -1)">↑</button>
+                                <button type="button" title="Move down" disabled="@(fileIndex == _selectedFiles.Count - 1)" @onclick="() => MoveFile(fileIndex, 1)">↓</button>
+                                <button type="button" title="Remove file" @onclick="() => RemoveFile(fileIndex)">×</button>
+                            </div>
+                        </div>
+
+                        <div class="file-edit-mode-switch" role="group" aria-label="Cut mode">
+                            <button type="button" class="@(selected.Mode == FileEditMode.Remove ? "active remove" : null)" @onclick="() => SetFileMode(fileIndex, FileEditMode.Remove)">
+                                <strong>Remove areas</strong><small>Delete one or many sections</small>
+                            </button>
+                            <button type="button" class="@(selected.Mode == FileEditMode.Keep ? "active keep" : null)" @onclick="() => SetFileMode(fileIndex, FileEditMode.Keep)">
+                                <strong>Keep one section</strong><small>Export only the green range</small>
+                            </button>
+                        </div>
+
+                        <div class="audio-cut-editor timeline-editor-body">
+                            @if (!string.IsNullOrWhiteSpace(selected.PreviewUrl))
+                            {
+                                <audio id="audio-preview-@fileIndex" class="timeline-audio-preview" controls preload="metadata" src="@selected.PreviewUrl"></audio>
+                            }
+
+                            @if (selected.DurationSeconds > 0)
+                            {
+                                <div class="timeline-ruler" aria-label="Audio timeline ruler">
+                                    <span>0:00</span>
+                                    <span>@FormatTimelineTime(selected.DurationSeconds / 4)</span>
+                                    <span>@FormatTimelineTime(selected.DurationSeconds / 2)</span>
+                                    <span>@FormatTimelineTime(selected.DurationSeconds * .75)</span>
+                                    <span>@FormatTimelineTime(selected.DurationSeconds)</span>
+                                </div>
+                                <div class="cut-timeline @(activeCut is null ? "no-active-cut" : null) @(selected.Mode == FileEditMode.Keep ? "keep-timeline" : null)">
+                                    <div class="timeline-wave" aria-hidden="true">
+                                        @for (var bar = 0; bar < 72; bar++)
+                                        {
+                                            <i style="height:@WaveHeight(bar, fileIndex)%"></i>
+                                        }
+                                    </div>
+
+                                    @for (var cutIndex = 0; cutIndex < selected.Cuts.Count; cutIndex++)
+                                    {
+                                        var regionIndex = cutIndex;
+                                        var region = selected.Cuts[regionIndex];
+                                        <button type="button"
+                                                class="timeline-cut-region @(selected.Mode == FileEditMode.Keep ? "keep-region" : null) @(selected.ActiveCutIndex == regionIndex ? "active" : null)"
+                                                style="@CutRegionStyle(region, selected.DurationSeconds)"
+                                                title="Edit area @(regionIndex + 1)"
+                                                @onclick="() => SelectCut(fileIndex, regionIndex)">
+                                            <span>@(selected.Mode == FileEditMode.Keep ? "KEEP" : $"CUT {regionIndex + 1}")</span>
+                                        </button>
+                                    }
+
+                                    @if (activeCut is not null)
+                                    {
+                                        var currentCutIndex = selected.ActiveCutIndex;
+                                        <div class="timeline-active-range @(selected.Mode == FileEditMode.Keep ? "keep-range" : null)" style="@CutRegionStyle(activeCut, selected.DurationSeconds)" aria-hidden="true"></div>
+                                        <input class="timeline-handle timeline-handle-start @(selected.Mode == FileEditMode.Keep ? "keep-handle" : null)"
+                                               aria-label="Selection start"
+                                               type="range" min="0" max="@selected.DurationSeconds.ToString(CultureInfo.InvariantCulture)" step="0.01"
+                                               value="@activeCut.StartSeconds.ToString(CultureInfo.InvariantCulture)"
+                                               @oninput="e => UpdateCutHandle(fileIndex, currentCutIndex, true, e)" />
+                                        <input class="timeline-handle timeline-handle-end @(selected.Mode == FileEditMode.Keep ? "keep-handle" : null)"
+                                               aria-label="Selection end"
+                                               type="range" min="0" max="@selected.DurationSeconds.ToString(CultureInfo.InvariantCulture)" step="0.01"
+                                               value="@activeCut.EndSeconds.ToString(CultureInfo.InvariantCulture)"
+                                               @oninput="e => UpdateCutHandle(fileIndex, currentCutIndex, false, e)" />
+                                        <div class="timeline-handle-label start" style="@TimelineMarkerStyle(activeCut.StartSeconds, selected.DurationSeconds)">START<br /><b>@FormatTimelineTime(activeCut.StartSeconds)</b></div>
+                                        <div class="timeline-handle-label end" style="@TimelineMarkerStyle(activeCut.EndSeconds, selected.DurationSeconds)">END<br /><b>@FormatTimelineTime(activeCut.EndSeconds)</b></div>
+                                    }
+                                </div>
+
+                                @if (activeCut is not null)
+                                {
+                                    var currentCutIndex = selected.ActiveCutIndex;
+                                    <div class="timeline-cut-controls">
+                                        <div class="timeline-time-field">
+                                            <label>Start</label>
+                                            <input class="audio-text-input" value="@FormatEditableTime(activeCut.StartSeconds)" @onchange="e => UpdateCutText(fileIndex, currentCutIndex, true, e)" />
+                                        </div>
+                                        <span class="timeline-arrow">→</span>
+                                        <div class="timeline-time-field">
+                                            <label>End</label>
+                                            <input class="audio-text-input" value="@FormatEditableTime(activeCut.EndSeconds)" @onchange="e => UpdateCutText(fileIndex, currentCutIndex, false, e)" />
+                                        </div>
+                                        <div class="timeline-cut-duration @(selected.Mode == FileEditMode.Keep ? "keep-duration" : null)">
+                                            <small>@(selected.Mode == FileEditMode.Keep ? "KEEP" : "REMOVE")</small>
+                                            <strong>@FormatTimelineTime(Math.Max(0, activeCut.EndSeconds - activeCut.StartSeconds))</strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="timeline-preview-actions">
+                                        <button type="button" @onclick="() => SetCutFromPlayheadAsync(fileIndex, currentCutIndex, true)">Set START at player</button>
+                                        <button type="button" @onclick="() => SetCutFromPlayheadAsync(fileIndex, currentCutIndex, false)">Set END at player</button>
+                                        <button type="button" class="play-cut" @onclick="() => PreviewCutAsync(fileIndex, currentCutIndex)">▶ Preview area</button>
+                                        @if (selected.Mode == FileEditMode.Remove)
+                                        {
+                                            <button type="button" class="remove-cut" @onclick="() => RemoveCut(fileIndex, currentCutIndex)">Delete cut</button>
+                                        }
+                                    </div>
+                                }
+
+                                @if (selected.Mode == FileEditMode.Remove)
+                                {
+                                    <div class="timeline-cut-chips">
+                                        @for (var cutIndex = 0; cutIndex < selected.Cuts.Count; cutIndex++)
+                                        {
+                                            var chipIndex = cutIndex;
+                                            var cut = selected.Cuts[chipIndex];
+                                            <button type="button" class="timeline-cut-chip @(selected.ActiveCutIndex == chipIndex ? "active" : null)" @onclick="() => SelectCut(fileIndex, chipIndex)">
+                                                <span>CUT @(chipIndex + 1)</span>
+                                                <strong>@FormatTimelineTime(cut.StartSeconds) → @FormatTimelineTime(cut.EndSeconds)</strong>
+                                            </button>
+                                        }
+                                        <button type="button" class="audio-add-cut timeline-add-cut" @onclick="() => AddCut(fileIndex)">+ Add cut area</button>
+                                    </div>
+                                    <small class="audio-cut-help">Red areas will be deleted. Leave this file with no red areas to keep the entire file.</small>
+                                }
+                                else
+                                {
+                                    <small class="audio-cut-help keep-help">Only the green area will be kept from this file. Everything before START and after END is discarded.</small>
+                                }
+                            }
+                            else
+                            {
+                                <div class="audio-cut-empty timeline-loading">
+                                    <span>Visual timeline unavailable for this file.</span>
+                                    <small>Try another MP3 if the browser cannot read its duration.</small>
+                                </div>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="audio-multi-panel audio-effects-panel">
+        <div class="audio-tool-panel-head">
+            <div>
+                <span class="section-label">02 · OUTPUT SETTINGS</span>
+                <h2>Volume and playback speed</h2>
+                <p>These settings are applied to the final MP3 after all selected files have been cut and joined.</p>
+            </div>
+        </div>
+
+        <div class="audio-effects-grid">
+            <div class="audio-slider-card multi-effect-card">
+                <div class="audio-slider-head">
+                    <div><strong>Volume</strong><small>100% keeps the original loudness.</small></div>
+                    <span>@_volumePercent%</span>
+                </div>
+                <input class="audio-range" type="range" min="0" max="400" step="5" @bind="_volumePercent" />
+                <div class="audio-range-labels"><span>0%</span><span>100%</span><span>200%</span><span>400%</span></div>
+                <div class="audio-speed-presets">
+                    @foreach (var preset in VolumePresets)
+                    {
+                        <button type="button" class="@(_volumePercent == preset ? "active" : null)" @onclick="() => SetVolume(preset)">@preset%</button>
+                    }
+                </div>
+            </div>
+
+            <div class="audio-slider-card multi-effect-card">
+                <div class="audio-slider-head">
+                    <div><strong>Playback speed</strong><small>Pitch is preserved with FFmpeg atempo.</small></div>
+                    <span>@($"{_speedFactor.ToString("0.00", CultureInfo.InvariantCulture)}x")</span>
+                </div>
+                <input class="audio-range" type="range" min="0.25" max="4" step="0.05" @bind="_speedFactor" />
+                <div class="audio-range-labels"><span>0.25x</span><span>1.00x</span><span>2.00x</span><span>4.00x</span></div>
+                <div class="audio-speed-presets">
+                    @foreach (var preset in SpeedPresets)
+                    {
+                        <button type="button" class="@(Math.Abs(_speedFactor - preset) < 0.001 ? "active" : null)" @onclick="() => SetSpeed(preset)">@($"{preset.ToString("0.##", CultureInfo.InvariantCulture)}x")</button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert error audio-alert">@_error</div>
+        }
+
+        <div class="audio-action-row multi-export-row">
+            <button type="button" class="download-button audio-process-button" disabled="@(_isProcessing || _selectedFiles.Count == 0)" @onclick="ProcessMultiAsync">
+                @if (_isProcessing)
+                {
+                    <span class="spinner" aria-hidden="true"></span><span>Processing MP3…</span>
+                }
+                else
+                {
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>
+                    <span>@(_selectedFiles.Count > 1 ? "Cut, merge & export MP3" : "Process & export MP3")</span>
+                }
+            </button>
+            <span>Temporary files are deleted after about @AudioToolService.RetentionHours hour@(AudioToolService.RetentionHours == 1 ? string.Empty : "s").</span>
+        </div>
+
+        @if (_result is not null)
+        {
+            <div class="audio-result-card">
+                <div><span class="section-label">READY</span><h3>Your edited MP3 is ready</h3><p>@_result.FileName</p></div>
+                <audio controls preload="metadata" src="@ResultUrl"></audio>
+                <a class="download-button" href="@DownloadUrl" download="@_result.FileName">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14" /></svg>
+                    Download MP3
+                </a>
+            </div>
+        }
+    </div>
+
+    <div class="audio-multi-panel audio-noise-panel">
+        <div class="audio-tool-panel-head">
+            <div>
+                <span class="section-label">03 · WHITE NOISE</span>
+                <h2>Create a white-noise MP3</h2>
+                <p>This generator is on the same page but runs independently, so no source MP3 is required.</p>
+            </div>
+        </div>
+
+        <div class="audio-noise-inline">
+            <div class="field-group">
+                <label for="noise-duration">Duration</label>
+                <input id="noise-duration" class="audio-text-input" @bind="_whiteNoiseDuration" placeholder="00:01:00" />
+                <small>Maximum 12 hours.</small>
+            </div>
+            <div class="field-group">
+                <label for="noise-level">Noise intensity</label>
+                <div class="audio-number-with-unit">
+                    <input id="noise-level" type="number" min="1" max="100" @bind="_whiteNoiseIntensity" />
+                    <span>%</span>
+                </div>
+                <small>Lower values produce softer white noise.</small>
+            </div>
+            <button type="button" class="download-button audio-process-button noise-process-button" disabled="@_isNoiseProcessing" @onclick="ProcessWhiteNoiseAsync">
+                @if (_isNoiseProcessing)
+                {
+                    <span class="spinner" aria-hidden="true"></span><span>Generating…</span>
+                }
+                else
+                {
+                    <span>Generate white noise</span>
+                }
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_noiseError))
+        {
+            <div class="alert error audio-alert">@_noiseError</div>
+        }
+
+        @if (_noiseResult is not null)
+        {
+            <div class="audio-result-card compact-result">
+                <div><span class="section-label">READY</span><h3>White-noise MP3 is ready</h3><p>@_noiseResult.FileName</p></div>
+                <audio controls preload="metadata" src="@NoiseResultUrl"></audio>
+                <a class="download-button" href="@NoiseDownloadUrl" download="@_noiseResult.FileName">Download MP3</a>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly List<SelectedAudioFile> _selectedFiles = new();
+    private int _volumePercent = 100;
+    private double _speedFactor = 1d;
+    private string _whiteNoiseDuration = "00:01:00";
+    private int _whiteNoiseIntensity = 20;
+    private bool _isProcessing;
+    private bool _isNoiseProcessing;
+    private string? _error;
+    private string? _noiseError;
+    private AudioToolResult? _result;
+    private AudioToolResult? _noiseResult;
+
+    private static readonly double[] SpeedPresets = [0.5d, 0.75d, 1d, 1.25d, 1.5d, 2d];
+    private static readonly int[] VolumePresets = [50, 100, 150, 200];
+
+    private string ResultUrl => _result is null ? string.Empty : $"/audio-results/{_result.Id}";
+    private string DownloadUrl => _result is null ? string.Empty : $"/audio-results/{_result.Id}?download=1";
+    private string NoiseResultUrl => _noiseResult is null ? string.Empty : $"/audio-results/{_noiseResult.Id}";
+    private string NoiseDownloadUrl => _noiseResult is null ? string.Empty : $"/audio-results/{_noiseResult.Id}?download=1";
+    private int TotalCutCount => _selectedFiles.Where(x => x.Mode == FileEditMode.Remove).Sum(x => x.Cuts.Count);
+    private int KeepModeCount => _selectedFiles.Count(x => x.Mode == FileEditMode.Keep);
+
+    private async Task HandleFilesSelected(InputFileChangeEventArgs e)
+    {
+        _error = null;
+        _result = null;
+        _selectedFiles.Clear();
+
+        try
+        {
+            foreach (var file in e.GetMultipleFiles(AudioToolService.MaxMergeFiles))
+            {
+                _selectedFiles.Add(new SelectedAudioFile(file));
+            }
+
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+
+            var metadata = await JS.InvokeAsync<AudioPreviewMetadata[]>("audioTimeline.loadSelectedFiles", "audio-source-input");
+            for (var index = 0; index < Math.Min(metadata.Length, _selectedFiles.Count); index++)
+            {
+                _selectedFiles[index].DurationSeconds = Math.Max(0, metadata[index].Duration);
+                _selectedFiles[index].PreviewUrl = metadata[index].Url ?? string.Empty;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            _error = $"You can select up to {AudioToolService.MaxMergeFiles} MP3 files at a time.";
+        }
+        catch (JSException)
+        {
+            _error = "The MP3 files were selected, but the browser could not prepare the visual timeline.";
+        }
+    }
+
+    private void MoveFile(int index, int direction)
+    {
+        var target = index + direction;
+        if (index < 0 || index >= _selectedFiles.Count || target < 0 || target >= _selectedFiles.Count) return;
+        (_selectedFiles[index], _selectedFiles[target]) = (_selectedFiles[target], _selectedFiles[index]);
+        _result = null;
+    }
+
+    private void RemoveFile(int index)
+    {
+        if (index < 0 || index >= _selectedFiles.Count) return;
+        _selectedFiles.RemoveAt(index);
+        _result = null;
+    }
+
+    private void SetFileMode(int fileIndex, FileEditMode mode)
+    {
+        if (fileIndex < 0 || fileIndex >= _selectedFiles.Count) return;
+        var selected = _selectedFiles[fileIndex];
+        if (selected.Mode == mode) return;
+
+        selected.Mode = mode;
+        selected.Cuts.Clear();
+        selected.ActiveCutIndex = -1;
+
+        if (mode == FileEditMode.Keep)
+        {
+            var duration = selected.DurationSeconds;
+            var start = duration > 0 ? duration * .15 : 0;
+            var end = duration > 0 ? duration * .85 : 10;
+            selected.Cuts.Add(new CutRangeEditor(start, Math.Max(start + .01, end)));
+            selected.ActiveCutIndex = 0;
+        }
+        _result = null;
+    }
+
+    private void AddCut(int fileIndex)
+    {
+        if (fileIndex < 0 || fileIndex >= _selectedFiles.Count) return;
+        var selected = _selectedFiles[fileIndex];
+        if (selected.Mode != FileEditMode.Remove) return;
+
+        var duration = selected.DurationSeconds;
+        double start;
+        double end;
+        if (duration > 0)
+        {
+            var seed = Math.Min(selected.Cuts.Count, 5);
+            start = Math.Min(duration * (.12 + seed * .12), Math.Max(0, duration - .25));
+            end = Math.Min(duration, start + Math.Max(.25, Math.Min(10, duration * .12)));
+            if (end <= start)
+            {
+                start = Math.Max(0, duration * .25);
+                end = Math.Min(duration, start + Math.Max(.1, duration * .25));
+            }
+        }
+        else
+        {
+            start = 10;
+            end = 20;
+        }
+
+        selected.Cuts.Add(new CutRangeEditor(start, end));
+        selected.ActiveCutIndex = selected.Cuts.Count - 1;
+        _result = null;
+    }
+
+    private void SelectCut(int fileIndex, int cutIndex)
+    {
+        if (fileIndex < 0 || fileIndex >= _selectedFiles.Count) return;
+        var selected = _selectedFiles[fileIndex];
+        if (cutIndex >= 0 && cutIndex < selected.Cuts.Count) selected.ActiveCutIndex = cutIndex;
+    }
+
+    private void RemoveCut(int fileIndex, int cutIndex)
+    {
+        if (fileIndex < 0 || fileIndex >= _selectedFiles.Count) return;
+        var selected = _selectedFiles[fileIndex];
+        if (selected.Mode != FileEditMode.Remove || cutIndex < 0 || cutIndex >= selected.Cuts.Count) return;
+        selected.Cuts.RemoveAt(cutIndex);
+        selected.ActiveCutIndex = selected.Cuts.Count == 0 ? -1 : Math.Min(cutIndex, selected.Cuts.Count - 1);
+        _result = null;
+    }
+
+    private void UpdateCutHandle(int fileIndex, int cutIndex, bool isStart, ChangeEventArgs e)
+    {
+        if (!TryGetCut(fileIndex, cutIndex, out var selected, out var cut) ||
+            !double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value)) return;
+
+        var duration = Math.Max(.01, selected!.DurationSeconds);
+        value = Math.Clamp(value, 0, duration);
+        const double gap = .01;
+        if (isStart) cut!.StartSeconds = Math.Min(value, Math.Max(0, cut.EndSeconds - gap));
+        else cut!.EndSeconds = Math.Max(value, Math.Min(duration, cut.StartSeconds + gap));
+        _result = null;
+    }
+
+    private void UpdateCutText(int fileIndex, int cutIndex, bool isStart, ChangeEventArgs e)
+    {
+        _error = null;
+        if (!TryGetCut(fileIndex, cutIndex, out var selected, out var cut)) return;
+        if (!TryParseTime(e.Value?.ToString(), out var value))
+        {
+            _error = "Invalid time. Use seconds, MM:SS or HH:MM:SS.";
+            return;
+        }
+
+        var duration = selected!.DurationSeconds > 0 ? selected.DurationSeconds : Math.Max(value, cut!.EndSeconds);
+        value = Math.Clamp(value, 0, duration);
+        const double gap = .01;
+        if (isStart) cut!.StartSeconds = Math.Min(value, Math.Max(0, cut.EndSeconds - gap));
+        else
+        {
+            cut!.EndSeconds = Math.Max(value, cut.StartSeconds + gap);
+            if (selected.DurationSeconds > 0) cut.EndSeconds = Math.Min(cut.EndSeconds, selected.DurationSeconds);
+        }
+        _result = null;
+    }
+
+    private async Task SetCutFromPlayheadAsync(int fileIndex, int cutIndex, bool isStart)
+    {
+        if (!TryGetCut(fileIndex, cutIndex, out _, out _)) return;
+        var current = await JS.InvokeAsync<double>("audioTimeline.getCurrentTime", $"audio-preview-{fileIndex}");
+        UpdateCutText(fileIndex, cutIndex, isStart, new ChangeEventArgs { Value = current.ToString(CultureInfo.InvariantCulture) });
+    }
+
+    private async Task PreviewCutAsync(int fileIndex, int cutIndex)
+    {
+        if (!TryGetCut(fileIndex, cutIndex, out _, out var cut)) return;
+        await JS.InvokeVoidAsync("audioTimeline.playRange", $"audio-preview-{fileIndex}", cut!.StartSeconds, cut.EndSeconds);
+    }
+
+    private bool TryGetCut(int fileIndex, int cutIndex, out SelectedAudioFile? selected, out CutRangeEditor? cut)
+    {
+        selected = null;
+        cut = null;
+        if (fileIndex < 0 || fileIndex >= _selectedFiles.Count) return false;
+        selected = _selectedFiles[fileIndex];
+        if (cutIndex < 0 || cutIndex >= selected.Cuts.Count) return false;
+        cut = selected.Cuts[cutIndex];
+        return true;
+    }
+
+    private static CutRangeEditor? GetActiveCut(SelectedAudioFile selected) =>
+        selected.ActiveCutIndex >= 0 && selected.ActiveCutIndex < selected.Cuts.Count ? selected.Cuts[selected.ActiveCutIndex] : null;
+
+    private void SetSpeed(double speed)
+    {
+        _speedFactor = speed;
+        _result = null;
+    }
+
+    private void SetVolume(int volume)
+    {
+        _volumePercent = volume;
+        _result = null;
+    }
+
+    private async Task ProcessMultiAsync()
+    {
+        _error = null;
+        _result = null;
+        if (_selectedFiles.Count == 0)
+        {
+            _error = "Choose at least one MP3 file first.";
+            return;
+        }
+        if (_volumePercent is < 0 or > 400)
+        {
+            _error = "Volume must be between 0% and 400%.";
+            return;
+        }
+        if (_speedFactor < .25d || _speedFactor > 4d)
+        {
+            _error = "Playback speed must be between 0.25x and 4.00x.";
+            return;
+        }
+
+        var edits = new List<AudioFileEdit>();
+        for (var fileIndex = 0; fileIndex < _selectedFiles.Count; fileIndex++)
+        {
+            var selected = _selectedFiles[fileIndex];
+            AudioCutRange? kept = null;
+            var removed = new List<AudioCutRange>();
+
+            if (selected.Mode == FileEditMode.Keep)
+            {
+                if (selected.Cuts.Count != 1)
+                {
+                    _error = $"File {fileIndex + 1}: choose the section you want to keep.";
+                    return;
+                }
+                var range = selected.Cuts[0];
+                if (!ValidateRange(selected, range, fileIndex, 0)) return;
+                kept = new AudioCutRange(range.StartSeconds, range.EndSeconds);
+            }
+            else
+            {
+                for (var cutIndex = 0; cutIndex < selected.Cuts.Count; cutIndex++)
+                {
+                    var cut = selected.Cuts[cutIndex];
+                    if (!ValidateRange(selected, cut, fileIndex, cutIndex)) return;
+                    removed.Add(new AudioCutRange(cut.StartSeconds, cut.EndSeconds));
+                }
+            }
+
+            edits.Add(new AudioFileEdit { FileIndex = fileIndex, RemovedSegments = removed, KeptSegment = kept });
+        }
+
+        var request = new AudioToolRequest
+        {
+            Operation = AudioOperation.Merge,
+            VolumePercent = _volumePercent,
+            SpeedFactor = _speedFactor,
+            FileEdits = edits
+        };
+
+        _isProcessing = true;
+        try
+        {
+            _result = await AudioToolService.ProcessAsync(request, _selectedFiles.Select(x => x.File).ToList(), CancellationToken.None);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch
+        {
+            _error = "Unable to process this MP3 right now. Please try again.";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private bool ValidateRange(SelectedAudioFile selected, CutRangeEditor cut, int fileIndex, int cutIndex)
+    {
+        if (cut.StartSeconds < 0 || cut.EndSeconds <= cut.StartSeconds)
+        {
+            _error = $"File {fileIndex + 1}, area {cutIndex + 1}: end time must be greater than start time.";
+            return false;
+        }
+        if (selected.DurationSeconds > 0 && cut.EndSeconds > selected.DurationSeconds + .05)
+        {
+            _error = $"File {fileIndex + 1}, area {cutIndex + 1}: selection is outside the MP3 duration.";
+            return false;
+        }
+        return true;
+    }
+
+    private async Task ProcessWhiteNoiseAsync()
+    {
+        _noiseError = null;
+        _noiseResult = null;
+        if (!TryParseTime(_whiteNoiseDuration, out var duration) || duration <= 0 || duration > 43_200)
+        {
+            _noiseError = "White noise duration must be between 1 second and 12 hours.";
+            return;
+        }
+        if (_whiteNoiseIntensity is < 1 or > 100)
+        {
+            _noiseError = "White noise intensity must be between 1% and 100%.";
+            return;
+        }
+
+        _isNoiseProcessing = true;
+        try
+        {
+            var request = new AudioToolRequest
+            {
+                Operation = AudioOperation.WhiteNoise,
+                WhiteNoiseDurationSeconds = duration,
+                WhiteNoiseIntensityPercent = _whiteNoiseIntensity
+            };
+            _noiseResult = await AudioToolService.ProcessAsync(request, Array.Empty<IBrowserFile>(), CancellationToken.None);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _noiseError = ex.Message;
+        }
+        catch
+        {
+            _noiseError = "Unable to generate white noise right now. Please try again.";
+        }
+        finally
+        {
+            _isNoiseProcessing = false;
+        }
+    }
+
+    private static bool TryParseTime(string? text, out double seconds)
+    {
+        seconds = 0;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var normalized = text.Trim().Replace(',', '.');
+        if (!normalized.Contains(':')) return double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out seconds);
+        var parts = normalized.Split(':');
+        if (parts.Length is < 2 or > 3) return false;
+        if (!double.TryParse(parts[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var sec) || sec < 0 || sec >= 60 ||
+            !int.TryParse(parts[^2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var min) || min < 0 || min >= 60) return false;
+        var hours = 0;
+        if (parts.Length == 3 && (!int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out hours) || hours < 0)) return false;
+        seconds = hours * 3600d + min * 60d + sec;
+        return true;
+    }
+
+    private static string CutRegionStyle(CutRangeEditor cut, double duration)
+    {
+        if (duration <= 0) return "left:0;width:0";
+        var left = Math.Clamp(cut.StartSeconds / duration * 100d, 0, 100);
+        var right = Math.Clamp(cut.EndSeconds / duration * 100d, left, 100);
+        return $"left:{left.ToString("0.###", CultureInfo.InvariantCulture)}%;width:{(right - left).ToString("0.###", CultureInfo.InvariantCulture)}%";
+    }
+
+    private static string TimelineMarkerStyle(double seconds, double duration)
+    {
+        var left = duration <= 0 ? 0 : Math.Clamp(seconds / duration * 100d, 0, 100);
+        return $"left:{left.ToString("0.###", CultureInfo.InvariantCulture)}%";
+    }
+
+    private static int WaveHeight(int index, int fileIndex) => 24 + ((index * 37 + fileIndex * 19 + index * index * 3) % 68);
+
+    private static string FormatTimelineTime(double seconds)
+    {
+        seconds = Math.Max(0, seconds);
+        var time = TimeSpan.FromSeconds(seconds);
+        return time.TotalHours >= 1 ? $"{(int)time.TotalHours}:{time.Minutes:00}:{time.Seconds:00}" : $"{(int)time.TotalMinutes}:{time.Seconds:00}";
+    }
+
+    private static string FormatEditableTime(double seconds)
+    {
+        seconds = Math.Max(0, seconds);
+        var hours = (int)(seconds / 3600);
+        var minutes = (int)((seconds % 3600) / 60);
+        var secs = seconds % 60;
+        return hours > 0 ? $"{hours:00}:{minutes:00}:{secs:00.##}" : $"{minutes:00}:{secs:00.##}";
+    }
+
+    private static string EditSummary(SelectedAudioFile selected)
+    {
+        if (selected.Mode == FileEditMode.Keep)
+        {
+            var range = selected.Cuts.FirstOrDefault();
+            return range is null ? "keep one section" : $"keep {FormatTimelineTime(range.StartSeconds)} → {FormatTimelineTime(range.EndSeconds)}";
+        }
+        return selected.Cuts.Count == 0 ? "keep full file" : $"remove {selected.Cuts.Count} area{(selected.Cuts.Count == 1 ? string.Empty : "s")}";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1024L * 1024 * 1024) return $"{bytes / (1024d * 1024 * 1024):0.##} GB";
+        if (bytes >= 1024L * 1024) return $"{bytes / (1024d * 1024):0.##} MB";
+        return $"{bytes / 1024d:0.##} KB";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("audioTimeline.revokeAllPreviews"); }
+        catch (JSDisconnectedException) { }
+    }
+
+    private enum FileEditMode { Remove, Keep }
+
+    private sealed class SelectedAudioFile
+    {
+        public SelectedAudioFile(IBrowserFile file) { File = file; }
+        public IBrowserFile File { get; }
+        public double DurationSeconds { get; set; }
+        public string PreviewUrl { get; set; } = string.Empty;
+        public FileEditMode Mode { get; set; } = FileEditMode.Remove;
+        public int ActiveCutIndex { get; set; } = -1;
+        public List<CutRangeEditor> Cuts { get; } = new();
+    }
+
+    private sealed class CutRangeEditor
+    {
+        public CutRangeEditor(double startSeconds, double endSeconds) { StartSeconds = startSeconds; EndSeconds = endSeconds; }
+        public double StartSeconds { get; set; }
+        public double EndSeconds { get; set; }
+    }
+
+    private sealed class AudioPreviewMetadata
+    {
+        public string? Url { get; set; }
+        public double Duration { get; set; }
+    }
+}

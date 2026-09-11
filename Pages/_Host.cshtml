@@ -28,6 +28,7 @@
         "/twitter-video-downloader" => ("X (Twitter) Video Downloader Online | Clip2Down", "Download accessible public X and Twitter videos online from status links. Save supported media as MP4 or MP3."),
         "/reddit-video-downloader" => ("Reddit Video Downloader Online – MP4 & MP3 | Clip2Down", "Download accessible public Reddit videos online from posts, redd.it shares and v.redd.it links as MP4 or MP3."),
         "/threads-video-downloader" => ("Threads Video Downloader Online | Clip2Down", "Download accessible public Threads videos online from threads.com and threads.net post links. Save supported media as MP4 or MP3."),
+        "/convert-mp3" => ("Convert MP3 Online – Cut, Speed, Volume & Merge | Clip2Down", "Edit MP3 files online with FFmpeg. Drag timeline handles to remove multiple sections, change playback speed or volume, create white noise and merge 2–10 MP3 files."),
         _ => ("Free Online Video Downloader – MP4 & MP3 | Clip2Down", "Free online video downloader for YouTube, Facebook, TikTok, Instagram, X, Reddit and Threads. Save accessible public videos as MP4 or MP3.")
     };
     var pageTitle = pageSeo.Item1;
@@ -111,7 +112,8 @@
                 "MP4 video export",
                 "MP3 audio extraction",
                 "Automatic source format detection before download",
-                "YouTube, Facebook, TikTok, Instagram, X, Reddit and Threads URL support"
+                "YouTube, Facebook, TikTok, Instagram, X, Reddit and Threads URL support",
+                "MP3 cutting, volume adjustment, white noise generation and merging"
             },
             ["provider"] = new Dictionary<string, object?> { ["@id"] = $"{origin}/#organization" },
             ["inLanguage"] = site.Language,

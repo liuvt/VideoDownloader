@@ -605,3 +605,66 @@ sudo chmod 600 /var/www/clip2down/cookies/facebook.txt
 ```
 
 Do not commit or publish the cookie file.
+
+## Convert MP3 page (2026-09-11)
+
+The site now includes `/convert-mp3` with five server-side FFmpeg tools:
+
+- remove one time range from an MP3;
+- extract/keep one time range;
+- increase or decrease volume from 0% to 400%;
+- generate a white-noise MP3;
+- merge multiple MP3 files in a user-selected order.
+
+The tool uses the FFmpeg binary already installed on the VPS. Production settings:
+
+```json
+{
+  "AudioTools": {
+    "FfmpegPath": "/usr/bin/ffmpeg",
+    "WorkRoot": "/var/www/clip2down/App_Data/audio-tools",
+    "MaxUploadSizeMb": 250,
+    "MaxMergeFiles": 10,
+    "RetentionHours": 2,
+    "ProcessTimeoutMinutes": 15,
+    "MaxTotalUploadSizeMb": 500,
+    "MaxConcurrentJobs": 2
+  }
+}
+```
+
+Verify the installed binary before restarting the application:
+
+```bash
+which ffmpeg
+ffmpeg -version
+```
+
+If `which ffmpeg` returns another path, update `AudioTools:FfmpegPath` in
+`appsettings.Production.json`. Create the work directory and grant the service
+account access:
+
+```bash
+sudo mkdir -p /var/www/clip2down/App_Data/audio-tools
+sudo chown -R www-data:www-data /var/www/clip2down/App_Data/audio-tools
+sudo chmod 750 /var/www/clip2down/App_Data/audio-tools
+```
+
+Finished MP3 results are served from `/audio-results/{id}` and are removed
+automatically after the configured retention period. The audio tool has its own
+cleanup worker and does not share the video download cleanup state.
+
+## Convert MP3 enhancements (2026-09-11)
+
+The `/convert-mp3` page now supports:
+
+- Advanced edit + merge for 2–10 MP3 files.
+- Multiple removable time intervals per source file before merge.
+- Reordering source files before the final merge.
+- Playback speed adjustment from 0.25x to 4.00x using FFmpeg `atempo` while preserving pitch.
+- Existing remove-section, extract-section, volume, white-noise and merge behavior remains available.
+
+All audio processing continues to use the server-side FFmpeg binary configured in `AudioTools:FfmpegPath`.
+
+## Convert MP3 v4 – unified multi editor
+`/convert-mp3` now uses one single-page workflow: upload 1–10 files, remove multiple ranges or keep one range per file, reorder/merge, change volume and speed together, and export one MP3. White-noise generation is available in a separate panel on the same page.

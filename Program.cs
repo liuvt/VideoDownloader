@@ -59,6 +59,8 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 
 builder.Services.Configure<DownloaderOptions>(
     builder.Configuration.GetSection(DownloaderOptions.SectionName));
+builder.Services.Configure<AudioToolsOptions>(
+    builder.Configuration.GetSection(AudioToolsOptions.SectionName));
 builder.Services.Configure<SiteOptions>(
     builder.Configuration.GetSection(SiteOptions.SectionName));
 
@@ -78,7 +80,9 @@ builder.Services.AddSingleton<IVideoDownloadQueue, VideoDownloadQueue>();
 builder.Services.AddSingleton<ThreadsMediaResolver>();
 builder.Services.AddSingleton<FacebookStoryResolver>();
 builder.Services.AddSingleton<YtDlpService>();
+builder.Services.AddSingleton<AudioToolService>();
 builder.Services.AddHostedService<VideoDownloadWorker>();
+builder.Services.AddHostedService<AudioToolCleanupService>();
 builder.Services.AddHostedService<DownloadCleanupService>();
 
 var app = builder.Build();
@@ -101,7 +105,7 @@ app.UseRouting();
 app.MapGet("/robots.txt", (HttpContext context, IOptions<SiteOptions> options) =>
 {
     var origin = GetPublicOrigin(context, options.Value);
-    var content = $"User-agent: *\nAllow: /\nDisallow: /downloads/\nSitemap: {origin}/sitemap.xml\n";
+    var content = $"User-agent: *\nAllow: /\nDisallow: /downloads/\nDisallow: /audio-results/\nSitemap: {origin}/sitemap.xml\n";
     return Results.Text(content, "text/plain; charset=utf-8");
 });
 
@@ -120,7 +124,8 @@ app.MapGet("/sitemap.xml", (HttpContext context, IOptions<SiteOptions> options) 
         new SitemapPage("/instagram-video-downloader", "weekly", "0.9", false),
         new SitemapPage("/twitter-video-downloader", "weekly", "0.9", false),
         new SitemapPage("/reddit-video-downloader", "weekly", "0.9", false),
-        new SitemapPage("/threads-video-downloader", "weekly", "0.9", false)
+        new SitemapPage("/threads-video-downloader", "weekly", "0.9", false),
+        new SitemapPage("/convert-mp3", "weekly", "0.9", false)
     };
 
     var xml = new StringBuilder();
@@ -204,6 +209,46 @@ app.MapGet("/downloads/{id:guid}", (
         filePath,
         GetContentType(filePath),
         job.FileName,
+        enableRangeProcessing: true);
+});
+
+
+app.MapGet("/audio-results/{id:guid}", (
+    Guid id,
+    HttpContext context,
+    AudioToolService audioToolService,
+    IOptions<AudioToolsOptions> options) =>
+{
+    context.Response.Headers.Append("X-Robots-Tag", "noindex, nofollow, noarchive");
+    context.Response.Headers.CacheControl = "private,no-store";
+
+    var result = audioToolService.GetResult(id);
+    if (result is null || !File.Exists(result.FilePath))
+    {
+        return Results.NotFound();
+    }
+
+    var configuredRoot = string.IsNullOrWhiteSpace(options.Value.WorkRoot)
+        ? "App_Data/audio-tools"
+        : options.Value.WorkRoot;
+    var root = Path.IsPathRooted(configuredRoot)
+        ? Path.GetFullPath(configuredRoot)
+        : Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, configuredRoot));
+    var filePath = Path.GetFullPath(result.FilePath);
+    var rootPrefix = root.EndsWith(Path.DirectorySeparatorChar)
+        ? root
+        : root + Path.DirectorySeparatorChar;
+
+    if (!filePath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest("Invalid audio result path.");
+    }
+
+    var download = context.Request.Query.ContainsKey("download");
+    return Results.File(
+        filePath,
+        "audio/mpeg",
+        download ? result.FileName : null,
         enableRangeProcessing: true);
 });
 
